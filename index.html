@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADEC Community Sensor Network Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <img src="https://dec.alaska.gov/media/1029/dec-logo.png"
+                     alt="ADEC Logo" class="sidebar-logo"
+                     onerror="this.style.display='none'">
+                <h2>Alaska Department of Environmental Conservation</h2>
+            </div>
+            <ul class="sidebar-menu">
+                <li>
+                    <a href="#" class="menu-item" data-view="dashboard">
+                        <span class="icon">&#9678;</span> Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="menu-item" data-view="all-sensors">
+                        <span class="icon">&#9632;</span> All Sensors
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="menu-item community-toggle" data-view="communities">
+                        <span class="icon">&#9660;</span> Communities
+                    </a>
+                    <ul class="community-list" id="community-list">
+                        <!-- Populated by JS -->
+                    </ul>
+                </li>
+                <li>
+                    <a href="#" class="menu-item" data-view="contacts">
+                        <span class="icon">&#9787;</span> Contacts
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main content -->
+        <main id="main-content">
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view active">
+                <h1>Community Sensor Network Dashboard</h1>
+                <div class="dashboard-stats" id="dashboard-stats"></div>
+                <div class="map-container">
+                    <h3>Live Sensor Map</h3>
+                    <iframe
+                        src="https://experience.arcgis.com/experience/8655256b056a48f6a19788d43cdab30f"
+                        class="map-iframe"
+                        title="AK Sensor Network Map"
+                        allowfullscreen>
+                    </iframe>
+                </div>
+            </div>
+
+            <!-- All Sensors View -->
+            <div id="view-all-sensors" class="view">
+                <div class="view-header">
+                    <h1>All Sensors</h1>
+                    <button class="btn btn-primary" onclick="openAddSensorModal()">+ Add Sensor</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="sensor-search" placeholder="Search sensors..." oninput="renderSensors()">
+                    <select id="sensor-status-filter" onchange="renderSensors()">
+                        <option value="">All Statuses</option>
+                        <option value="Online">Online</option>
+                        <option value="Offline">Offline</option>
+                        <option value="Collocation">Collocation</option>
+                        <option value="PM Sensor Issue">PM Sensor Issue</option>
+                        <option value="In Storage">In Storage</option>
+                        <option value="In Transit">In Transit</option>
+                        <option value="Servicing">Servicing</option>
+                    </select>
+                </div>
+                <div class="table-container">
+                    <table id="sensors-table">
+                        <thead>
+                            <tr>
+                                <th>Sensor ID</th>
+                                <th>SOA Tag ID</th>
+                                <th>Status</th>
+                                <th>Community</th>
+                                <th>Location</th>
+                                <th>Purchase Date</th>
+                                <th>Collocation Dates</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sensors-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- All Communities View -->
+            <div id="view-communities" class="view">
+                <div class="view-header">
+                    <h1>All Communities</h1>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="community-search" placeholder="Search communities..." oninput="renderCommunitiesList()">
+                </div>
+                <div id="communities-list-container"></div>
+            </div>
+
+            <!-- Single Community View -->
+            <div id="view-community" class="view">
+                <div class="view-header">
+                    <h1 id="community-name"></h1>
+                    <span class="community-type-badge" id="community-type-badge"></span>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" data-tab="community-sensors">Sensors</button>
+                    <button class="tab" data-tab="community-contacts">Contacts</button>
+                    <button class="tab" data-tab="community-history">Community History</button>
+                    <button class="tab" data-tab="community-comms">Communications</button>
+                    <button class="tab" data-tab="community-files">Files</button>
+                </div>
+
+                <div id="tab-community-sensors" class="tab-content active">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Sensor ID</th>
+                                    <th>SOA Tag ID</th>
+                                    <th>Status</th>
+                                    <th>Location</th>
+                                    <th>Purchase Date</th>
+                                    <th>Collocation Dates</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="community-sensors-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="tab-community-contacts" class="tab-content">
+                    <div id="community-contacts-list" class="contacts-grid"></div>
+                </div>
+
+                <div id="tab-community-history" class="tab-content">
+                    <div class="history-actions">
+                        <button class="btn btn-primary" onclick="openAddNoteModal(currentCommunity, 'community')">+ Add Note</button>
+                    </div>
+                    <div id="community-history-timeline" class="timeline"></div>
+                </div>
+
+                <div id="tab-community-comms" class="tab-content">
+                    <div class="history-actions">
+                        <button class="btn btn-primary" onclick="openCommModal(currentCommunity)">+ Log Communication</button>
+                    </div>
+                    <div id="community-comms-timeline" class="timeline"></div>
+                </div>
+
+                <div id="tab-community-files" class="tab-content">
+                    <div class="history-actions">
+                        <label class="btn btn-primary" style="cursor:pointer">
+                            + Upload File
+                            <input type="file" id="file-upload-input" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none" onchange="handleFileUpload(event)">
+                        </label>
+                    </div>
+                    <div id="community-files-grid" class="files-grid"></div>
+                </div>
+            </div>
+
+            <!-- Contacts View -->
+            <div id="view-contacts" class="view">
+                <div class="view-header">
+                    <h1>All Contacts</h1>
+                    <button class="btn btn-primary" onclick="openAddContactModal()">+ Add Contact</button>
+                    <button class="btn btn-primary" onclick="openEmailModal()">&#9993; Email</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="contact-search" placeholder="Search contacts..." oninput="renderContacts()">
+                </div>
+                <div id="contacts-grid"></div>
+            </div>
+
+            <!-- Single Contact View -->
+            <div id="view-contact-detail" class="view">
+                <div class="view-header">
+                    <h1 id="contact-detail-name"></h1>
+                </div>
+                <div class="contact-info-card" id="contact-info-card"></div>
+
+                <div class="history-actions">
+                    <button class="btn btn-primary" onclick="openContactCommModal()">+ Log Communication</button>
+                </div>
+                <div id="contact-all-timeline" class="timeline"></div>
+            </div>
+
+            <!-- Single Sensor View -->
+            <div id="view-sensor-detail" class="view">
+                <div class="view-header">
+                    <h1 id="sensor-detail-title"></h1>
+                </div>
+                <div class="sensor-info-card" id="sensor-info-card"></div>
+
+                <div class="tabs">
+                    <button class="tab active" data-tab="sensor-history">Device History</button>
+                </div>
+
+                <div id="tab-sensor-history" class="tab-content active">
+                    <div class="history-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <button class="btn btn-primary" onclick="openAddNoteModal(currentSensor, 'sensor')">+ Add Note</button>
+                        <select id="sensor-history-filter" onchange="filterSensorHistory()">
+                            <option value="">All History</option>
+                            <option value="Info Edit">Info Edits</option>
+                            <option value="Status Change">Status Changes</option>
+                            <option value="Movement">Movements</option>
+                            <option value="Audit">Audits</option>
+                            <option value="Communication">Communications</option>
+                            <option value="Installation">Installations</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Issue">Issues</option>
+                            <option value="General">General</option>
+                        </select>
+                    </div>
+                    <div id="sensor-history-timeline" class="timeline"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- Add Sensor Modal -->
+    <div id="modal-add-sensor" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="sensor-modal-title">Add New Sensor</h2>
+                <button class="modal-close" onclick="closeModal('modal-add-sensor')">&times;</button>
+            </div>
+            <form id="sensor-form" onsubmit="saveSensor(event)">
+                <input type="hidden" id="sensor-edit-id">
+                <div class="form-group">
+                    <label>Sensor ID (e.g. Mod_660)</label>
+                    <input type="text" id="sensor-id-input" required>
+                </div>
+                <div class="form-group">
+                    <label>SOA Tag ID</label>
+                    <input type="text" id="sensor-soa-input" placeholder="e.g. SOA-12345">
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="sensor-type-input">
+                        <option value="Community Pod">Community Pod</option>
+                        <option value="Permanent Pod">Permanent Pod</option>
+                        <option value="Audit Pod">Audit Pod</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="sensor-status-input">
+                        <option value="Online">Online</option>
+                        <option value="Offline">Offline</option>
+                        <option value="Collocation">Collocation</option>
+                        <option value="PM Sensor Issue">PM Sensor Issue</option>
+                        <option value="In Storage">In Storage</option>
+                        <option value="In Transit">In Transit</option>
+                        <option value="Servicing">Servicing</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Current Community</label>
+                    <select id="sensor-community-input">
+                        <option value="">— None —</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Location (address or coordinates)</label>
+                    <input type="text" id="sensor-location-input">
+                </div>
+                <div class="form-group">
+                    <label>Purchase Date</label>
+                    <input type="date" id="sensor-purchased-input">
+                </div>
+                <div class="form-group">
+                    <label>Collocation Dates</label>
+                    <input type="text" id="sensor-collocation-input" placeholder="e.g. Mar 5 - Mar 13, 2026">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-add-sensor')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Sensor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Move Sensor Modal -->
+    <div id="modal-move-sensor" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Move Sensor</h2>
+                <button class="modal-close" onclick="closeModal('modal-move-sensor')">&times;</button>
+            </div>
+            <form id="move-sensor-form" onsubmit="moveSensor(event)">
+                <input type="hidden" id="move-sensor-id">
+                <div class="form-group">
+                    <label>Sensor: <strong id="move-sensor-label"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label>Current Community: <strong id="move-from-label"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label>Move To Community</label>
+                    <select id="move-to-community" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Date of Move</label>
+                    <input type="datetime-local" id="move-date">
+                </div>
+                <div class="form-group">
+                    <label>Additional Details (optional)</label>
+                    <textarea id="move-additional-info" rows="4" class="mention-textarea" placeholder="e.g. Removed by AC for recommended servicing. Type @ to tag a contact."></textarea>
+                    <div class="mention-dropdown" id="move-mention-dropdown"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-move-sensor')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Move Sensor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Inline Status Change Modal -->
+    <div id="modal-status-change" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>Change Sensor Status</h2>
+                <button class="modal-close" onclick="closeModal('modal-status-change')">&times;</button>
+            </div>
+            <form id="status-change-form" onsubmit="saveStatusChange(event)">
+                <input type="hidden" id="status-change-sensor-id">
+                <input type="hidden" id="status-change-old">
+                <div class="form-group">
+                    <label>Sensor: <strong id="status-change-sensor-label"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label>New Status</label>
+                    <select id="status-change-new" required>
+                        <option value="Online">Online</option>
+                        <option value="Offline">Offline</option>
+                        <option value="Collocation">Collocation</option>
+                        <option value="PM Sensor Issue">PM Sensor Issue</option>
+                        <option value="In Storage">In Storage</option>
+                        <option value="In Transit">In Transit</option>
+                        <option value="Servicing">Servicing</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="datetime-local" id="status-change-date">
+                </div>
+                <div class="form-group">
+                    <label>Additional Info (optional)</label>
+                    <textarea id="status-change-info" rows="3" class="mention-textarea" placeholder="Type @ to tag a contact."></textarea>
+                    <div class="mention-dropdown" id="status-mention-dropdown"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-status-change')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Contact Modal -->
+    <div id="modal-add-contact" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="contact-modal-title">Add New Contact</h2>
+                <button class="modal-close" onclick="closeModal('modal-add-contact')">&times;</button>
+            </div>
+            <form id="contact-form" onsubmit="saveContact(event)">
+                <input type="hidden" id="contact-edit-id">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="contact-name-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Role / Title</label>
+                    <input type="text" id="contact-role-input" placeholder="e.g. Tribal Administrator">
+                </div>
+                <div class="form-group">
+                    <label>Community</label>
+                    <select id="contact-community-input" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="contact-email-input">
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="tel" id="contact-phone-input">
+                </div>
+                <div class="form-group">
+                    <label>Organization</label>
+                    <input type="text" id="contact-org-input" placeholder="e.g. Kodiak Area Native Association">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-add-contact')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Contact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Note Modal -->
+    <div id="modal-add-note" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Note</h2>
+                <button class="modal-close" onclick="closeModal('modal-add-note')">&times;</button>
+            </div>
+            <form id="note-form" onsubmit="saveNote(event)">
+                <input type="hidden" id="note-context-id">
+                <input type="hidden" id="note-context-type">
+                <div class="form-group">
+                    <label>Note Type</label>
+                    <select id="note-type-input">
+                        <option value="General">General</option>
+                        <option value="Audit">Audit</option>
+                        <option value="Installation">Installation</option>
+                        <option value="Removal">Removal</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Issue">Issue</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="datetime-local" id="note-date-input">
+                </div>
+                <div class="form-group" style="position:relative">
+                    <label>Note</label>
+                    <textarea id="note-text-input" rows="4" required class="mention-textarea" placeholder="Type @ to tag contacts (autocomplete will appear)."></textarea>
+                    <div class="mention-dropdown" id="note-mention-dropdown"></div>
+                </div>
+                <div class="form-group">
+                    <label>Tag Sensors</label>
+                    <div class="tag-chip-container" id="tag-sensors-container">
+                        <div class="tag-chips">
+                            <input type="text" class="tag-chip-input" placeholder="Type to search sensors...">
+                        </div>
+                        <div class="tag-chip-dropdown mention-dropdown"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Tag Communities</label>
+                    <div class="tag-chip-container" id="tag-communities-container">
+                        <div class="tag-chips">
+                            <input type="text" class="tag-chip-input" placeholder="Type to search communities...">
+                        </div>
+                        <div class="tag-chip-dropdown mention-dropdown"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Tag Contacts</label>
+                    <div class="tag-chip-container" id="tag-contacts-container">
+                        <div class="tag-chips">
+                            <input type="text" class="tag-chip-input" placeholder="Type to search contacts...">
+                        </div>
+                        <div class="tag-chip-dropdown mention-dropdown"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-add-note')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Note</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Log Communication Modal -->
+    <div id="modal-comm" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Log Communication</h2>
+                <button class="modal-close" onclick="closeModal('modal-comm')">&times;</button>
+            </div>
+            <form id="comm-form" onsubmit="saveComm(event)">
+                <input type="hidden" id="comm-community-id">
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="comm-type-input">
+                        <option value="Email">Email</option>
+                        <option value="Phone Call">Phone Call</option>
+                        <option value="Site Visit">Site Visit</option>
+                        <option value="Video Call">Video Call</option>
+                        <option value="Text Message">Text Message</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="datetime-local" id="comm-date-input">
+                </div>
+                <div class="form-group">
+                    <label>Contacts Involved (comma-separated names)</label>
+                    <input type="text" id="comm-contacts-input" placeholder="e.g. Patricia Valerio, Kim Sweet">
+                </div>
+                <div class="form-group">
+                    <label>Summary</label>
+                    <textarea id="comm-text-input" rows="4" required class="mention-textarea" placeholder="Describe the communication..."></textarea>
+                    <div class="mention-dropdown" id="comm-mention-dropdown"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-comm')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Email Composer Modal -->
+    <div id="modal-email" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Compose Email</h2>
+                <button class="modal-close" onclick="closeModal('modal-email')">&times;</button>
+            </div>
+            <div class="email-composer">
+                <div class="email-toolbar">
+                    <button type="button" class="btn btn-sm" onclick="emailSelectAll()">Select All</button>
+                    <button type="button" class="btn btn-sm" onclick="emailDeselectAll()">Deselect All</button>
+                    <button type="button" class="btn btn-sm" onclick="emailShowAll()">Show All</button>
+                    <span class="email-toolbar-divider">|</span>
+                    <label class="email-toolbar-label">Filter by Community:</label>
+                    <select id="email-community-filter" onchange="emailFilterByCommunity()">
+                        <option value="">All Communities</option>
+                    </select>
+                </div>
+                <div id="email-recipients-list" class="email-recipients-list"></div>
+                <div class="form-group">
+                    <label>Subject</label>
+                    <input type="text" id="email-subject" required>
+                </div>
+                <div class="form-group">
+                    <label>Body</label>
+                    <textarea id="email-body" rows="8" placeholder="Write your email..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-email')">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="sendEmail()">Draft &amp; Send in Outlook</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Annotation Modal -->
+    <div id="modal-edit-annotation" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>Annotate Change</h2>
+                <button class="modal-close" onclick="skipEditAnnotation()">&times;</button>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+                <p id="edit-annotation-summary" style="font-size:14px;color:var(--slate-700);line-height:1.5;padding:0 4px"></p>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="datetime-local" id="edit-annotation-date">
+            </div>
+            <div class="form-group">
+                <label>Additional Notes (optional)</label>
+                <textarea id="edit-annotation-text" rows="3" placeholder="e.g. Power failure at building, contacts needed to move the sensor to a new location."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="skipEditAnnotation()">Skip</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditAnnotation()">Save Note</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
