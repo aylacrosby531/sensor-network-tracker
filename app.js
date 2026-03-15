@@ -1,17 +1,23 @@
 // ===== DATA LAYER =====
 const COMMUNITIES = [
-    { id: 'anchorage', name: 'Anchorage', type: 'Regulatory Site' },
-    { id: 'fairbanks', name: 'Fairbanks', type: 'Regulatory Site' },
-    { id: 'juneau', name: 'Juneau', type: 'Regulatory Site' },
-    { id: 'bethel', name: 'Bethel', type: 'Community' },
-    { id: 'homer', name: 'Homer', type: 'Community' },
-    { id: 'ketchikan', name: 'Ketchikan', type: 'Community' },
-    { id: 'kodiak', name: 'Kodiak', type: 'Community' },
-    { id: 'ninilchik', name: 'Ninilchik', type: 'Community' },
-    { id: 'sitka', name: 'Sitka', type: 'Community' },
-    { id: 'tyonek', name: 'Tyonek', type: 'Community' },
-    { id: 'wasilla', name: 'Wasilla', type: 'Community' },
-    { id: 'wrangell', name: 'Wrangell', type: 'Community' },
+    { id: 'anchorage', name: 'Anchorage' },
+    { id: 'fairbanks', name: 'Fairbanks' },
+    { id: 'juneau', name: 'Juneau' },
+    { id: 'bethel', name: 'Bethel' },
+    { id: 'homer', name: 'Homer' },
+    { id: 'ketchikan', name: 'Ketchikan' },
+    { id: 'kodiak', name: 'Kodiak' },
+    { id: 'ninilchik', name: 'Ninilchik' },
+    { id: 'sitka', name: 'Sitka' },
+    { id: 'tyonek', name: 'Tyonek' },
+    { id: 'wasilla', name: 'Wasilla' },
+    { id: 'wrangell', name: 'Wrangell' },
+];
+
+const AVAILABLE_TAGS = [
+    'Regulatory Site',
+    'Municipality of Anchorage Network',
+    'Interior Network',
 ];
 
 function loadData(key, fallback) {
@@ -30,6 +36,21 @@ let contacts = loadData('contacts', []);
 let notes = loadData('notes', []);
 let comms = loadData('comms', []);
 let communityFiles = loadData('communityFiles', {});
+let communityTags = loadData('communityTags', {});
+
+// Initialize default tags if empty
+if (Object.keys(communityTags).length === 0) {
+    communityTags = {
+        anchorage: ['Regulatory Site', 'Municipality of Anchorage Network'],
+        fairbanks: ['Regulatory Site', 'Interior Network'],
+        juneau: ['Regulatory Site'],
+    };
+    saveData('communityTags', communityTags);
+}
+
+function getCommunityTags(communityId) {
+    return communityTags[communityId] || [];
+}
 
 function persist() {
     saveData('sensors', sensors);
@@ -37,6 +58,7 @@ function persist() {
     saveData('notes', notes);
     saveData('comms', comms);
     saveData('communityFiles', communityFiles);
+    saveData('communityTags', communityTags);
 }
 
 // Load sample data on first run
@@ -69,6 +91,57 @@ if (sensors.length === 0 && contacts.length === 0) {
         }
     ];
     persist();
+}
+
+// ===== USER SYSTEM =====
+let appUsers = loadData('appUsers', []);
+let currentUser = null;
+
+function showLoginScreen() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+
+    const list = document.getElementById('login-user-list');
+    if (appUsers.length > 0) {
+        list.innerHTML = appUsers.map(u =>
+            `<button class="login-user-btn" onclick="loginUser('${u.replace(/'/g, "\\'")}')">
+                ${u}
+            </button>`
+        ).join('');
+    } else {
+        list.innerHTML = '';
+    }
+}
+
+function loginUser(name) {
+    currentUser = name;
+    saveData('currentUser', name);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('sidebar-user').innerHTML =
+        `<span class="user-name">${currentUser}</span><span class="user-logout">Sign out</span>`;
+    showView('dashboard');
+}
+
+function addAndLoginUser() {
+    const input = document.getElementById('login-new-name');
+    const name = input.value.trim();
+    if (!name) return;
+    if (!appUsers.includes(name)) {
+        appUsers.push(name);
+        saveData('appUsers', appUsers);
+    }
+    loginUser(name);
+}
+
+function logoutUser() {
+    currentUser = null;
+    saveData('currentUser', null);
+    showLoginScreen();
+}
+
+function getCurrentUserName() {
+    return currentUser || 'Unknown';
 }
 
 // ===== STATE =====
@@ -125,8 +198,8 @@ function showView(viewName) {
 
 // ===== DASHBOARD =====
 function renderDashboard() {
-    const online = sensors.filter(s => s.status === 'Online').length;
-    const offline = sensors.filter(s => s.status !== 'Online').length;
+    const online = sensors.filter(s => getStatusArray(s).includes('Online')).length;
+    const offline = sensors.filter(s => !getStatusArray(s).includes('Online')).length;
 
     document.getElementById('dashboard-stats').innerHTML = `
         <div class="stat-card"><div class="stat-value">${sensors.length}</div><div class="stat-label">Total Sensors</div></div>
@@ -138,24 +211,40 @@ function renderDashboard() {
 }
 
 // ===== COMMUNITIES LIST VIEW =====
+let communityTagFilter = '';
+
 function renderCommunitiesList() {
     const search = (document.getElementById('community-search')?.value || '').toLowerCase();
     let filtered = COMMUNITIES.filter(c => {
         if (search && !c.name.toLowerCase().includes(search)) return false;
+        if (communityTagFilter && !getCommunityTags(c.id).includes(communityTagFilter)) return false;
         return true;
     });
 
     const container = document.getElementById('communities-list-container');
-    container.innerHTML = filtered.map(c => {
+
+    // Show active filter banner
+    const filterBanner = communityTagFilter
+        ? `<div class="tag-filter-banner">
+            Showing: <strong>${communityTagFilter}</strong>
+            <span class="clickable" onclick="clearCommunityTagFilter()" style="margin-left:8px">Show All</span>
+          </div>`
+        : '';
+
+    container.innerHTML = filterBanner + filtered.map(c => {
         const commSensors = sensors.filter(s => s.community === c.id);
         const sensorListStr = commSensors.length > 0
             ? commSensors.map(s => s.id).join(', ')
             : 'No sensors';
+        const tags = getCommunityTags(c.id);
+        const tagsHtml = tags.map(t =>
+            `<span class="community-type-badge clickable-badge" onclick="event.stopPropagation(); filterCommunitiesByTag('${t}')">${t}</span>`
+        ).join(' ');
         return `
             <div class="community-card" onclick="showCommunity('${c.id}')">
                 <div class="community-card-info">
                     <h3>${c.name}</h3>
-                    <div class="community-card-type">${c.type}</div>
+                    <div class="community-card-tags">${tagsHtml || '<span style="color:var(--slate-400);font-size:12px">No tags</span>'}</div>
                 </div>
                 <div class="community-card-sensors">
                     <div><strong>Associated Sensors:</strong></div>
@@ -166,18 +255,54 @@ function renderCommunitiesList() {
     }).join('') || '<div class="empty-state">No communities found.</div>';
 }
 
+function filterCommunitiesByTag(tag) {
+    communityTagFilter = tag;
+    renderCommunitiesList();
+}
+
+function clearCommunityTagFilter() {
+    communityTagFilter = '';
+    renderCommunitiesList();
+}
+
 // ===== SENSORS =====
 function getStatusBadgeClass(status) {
     const map = {
         'Online': 'badge-online',
         'Offline': 'badge-offline',
-        'Collocation': 'badge-collocation',
-        'PM Sensor Issue': 'badge-issue',
-        'In Storage': 'badge-storage',
         'In Transit': 'badge-transit',
-        'Servicing': 'badge-servicing',
+        'Service at Quant': 'badge-service-quant',
+        'Collocation': 'badge-collocation',
+        'Auditing a Community': 'badge-auditing',
+        'Lab Storage': 'badge-lab-storage',
+        'Needs Repair': 'badge-needs-repair',
+        'Ready for Deployment': 'badge-ready',
+        'PM Sensor Issue': 'badge-issue',
+        'Gaseous Sensor Issue': 'badge-issue',
+        'SD Card Issue': 'badge-issue',
     };
-    return map[status] || 'badge-storage';
+    return map[status] || 'badge-offline';
+}
+
+// Get status as array (handles old single-string data and new array data)
+function getStatusArray(s) {
+    if (Array.isArray(s.status)) return s.status;
+    if (s.status) return [s.status];
+    return [];
+}
+
+function getStatusDisplay(s) {
+    return getStatusArray(s).join(', ') || '—';
+}
+
+function renderStatusBadges(s, clickable) {
+    const statuses = getStatusArray(s);
+    if (statuses.length === 0) return '—';
+    return statuses.map(st => {
+        const cls = clickable ? 'badge-clickable' : '';
+        const onclick = clickable ? `onclick="openStatusChangeModal('${s.id}')"` : '';
+        return `<span class="badge ${getStatusBadgeClass(st)} ${cls}" ${onclick}>${st}</span>`;
+    }).join(' ');
 }
 
 function getCommunityName(id) {
@@ -191,7 +316,7 @@ function renderSensors() {
 
     let filtered = sensors.filter(s => {
         if (search && !s.id.toLowerCase().includes(search) && !getCommunityName(s.community).toLowerCase().includes(search) && !(s.soaTagId || '').toLowerCase().includes(search)) return false;
-        if (statusFilter && s.status !== statusFilter) return false;
+        if (statusFilter && !getStatusArray(s).includes(statusFilter)) return false;
         return true;
     });
 
@@ -199,7 +324,7 @@ function renderSensors() {
         <tr>
             <td><span class="clickable" onclick="showSensorDetail('${s.id}')">${s.id}</span><br><small style="color:#888">${s.type}</small></td>
             <td>${s.soaTagId || '—'}</td>
-            <td><span class="badge ${getStatusBadgeClass(s.status)} badge-clickable" onclick="openStatusChangeModal('${s.id}')">${s.status}</span></td>
+            <td>${renderStatusBadges(s, true)}</td>
             <td><span class="clickable" onclick="showCommunity('${s.community}')">${getCommunityName(s.community)}</span></td>
             <td>${s.location || '—'}</td>
             <td>${s.datePurchased || '—'}</td>
@@ -217,6 +342,7 @@ function openAddSensorModal() {
     document.getElementById('sensor-form').reset();
     document.getElementById('sensor-edit-id').value = '';
     populateCommunitySelect('sensor-community-input');
+    renderStatusToggleList('sensor-status-input', []);
     openModal('modal-add-sensor');
 }
 
@@ -228,7 +354,7 @@ function openEditSensorModal(sensorId) {
     document.getElementById('sensor-id-input').value = s.id;
     document.getElementById('sensor-soa-input').value = s.soaTagId || '';
     document.getElementById('sensor-type-input').value = s.type;
-    document.getElementById('sensor-status-input').value = s.status;
+    renderStatusToggleList('sensor-status-input', getStatusArray(s));
     populateCommunitySelect('sensor-community-input');
     document.getElementById('sensor-community-input').value = s.community;
     document.getElementById('sensor-location-input').value = s.location || '';
@@ -248,7 +374,7 @@ function saveSensor(e) {
         id: document.getElementById('sensor-id-input').value.trim(),
         soaTagId: document.getElementById('sensor-soa-input').value.trim(),
         type: document.getElementById('sensor-type-input').value,
-        status: document.getElementById('sensor-status-input').value,
+        status: getSelectedStatuses('sensor-status-input'),
         community: document.getElementById('sensor-community-input').value,
         location: document.getElementById('sensor-location-input').value.trim(),
         datePurchased: document.getElementById('sensor-purchased-input').value,
@@ -268,11 +394,20 @@ function saveSensor(e) {
 
         const changes = [];
         for (const [field, label] of Object.entries(fieldLabels)) {
-            const oldVal = oldSensor[field] || '';
-            const newVal = data[field] || '';
-            if (oldVal !== newVal) {
-                const oldDisplay = field === 'community' ? getCommunityName(oldVal) : (oldVal || '(empty)');
-                const newDisplay = field === 'community' ? getCommunityName(newVal) : (newVal || '(empty)');
+            const oldVal = oldSensor[field];
+            const newVal = data[field];
+            // Compare arrays (status) as strings
+            const oldStr = Array.isArray(oldVal) ? oldVal.join(', ') : (oldVal || '');
+            const newStr = Array.isArray(newVal) ? newVal.join(', ') : (newVal || '');
+            if (oldStr !== newStr) {
+                let oldDisplay, newDisplay;
+                if (field === 'community') {
+                    oldDisplay = getCommunityName(oldVal);
+                    newDisplay = getCommunityName(newVal);
+                } else {
+                    oldDisplay = oldStr || '(empty)';
+                    newDisplay = newStr || '(empty)';
+                }
                 changes.push({ field, label, oldVal: oldDisplay, newVal: newDisplay, sensorId: editId });
             }
         }
@@ -352,6 +487,7 @@ function buildAnnotationNote(annotation, additionalInfo, date) {
         type: noteType,
         text: noteText,
         additionalInfo: additionalInfo || '',
+        createdBy: getCurrentUserName(),
         taggedSensors: [annotation.sensorId],
         taggedCommunities: taggedCommunities,
         taggedContacts: additionalInfo ? parseMentionedContacts(additionalInfo) : [],
@@ -386,9 +522,9 @@ function openStatusChangeModal(sensorId) {
     const s = sensors.find(x => x.id === sensorId);
     if (!s) return;
     document.getElementById('status-change-sensor-id').value = s.id;
-    document.getElementById('status-change-old').value = s.status;
+    document.getElementById('status-change-old').value = JSON.stringify(getStatusArray(s));
     document.getElementById('status-change-sensor-label').textContent = s.id;
-    document.getElementById('status-change-new').value = s.status;
+    renderStatusToggleList('status-change-new', getStatusArray(s));
     document.getElementById('status-change-info').value = '';
     document.getElementById('status-change-date').value = nowDatetime();
     openModal('modal-status-change');
@@ -397,12 +533,15 @@ function openStatusChangeModal(sensorId) {
 function saveStatusChange(e) {
     e.preventDefault();
     const sensorId = document.getElementById('status-change-sensor-id').value;
-    const oldStatus = document.getElementById('status-change-old').value;
-    const newStatus = document.getElementById('status-change-new').value;
+    const oldStatuses = JSON.parse(document.getElementById('status-change-old').value);
+    const newStatuses = getSelectedStatuses('status-change-new');
     const additionalInfo = document.getElementById('status-change-info').value.trim();
     const statusDate = document.getElementById('status-change-date').value || nowDatetime();
 
-    if (oldStatus === newStatus) {
+    const oldStr = oldStatuses.join(', ') || '(none)';
+    const newStr = newStatuses.join(', ') || '(none)';
+
+    if (oldStr === newStr) {
         closeModal('modal-status-change');
         return;
     }
@@ -410,9 +549,9 @@ function saveStatusChange(e) {
     const s = sensors.find(x => x.id === sensorId);
     if (!s) return;
 
-    s.status = newStatus;
+    s.status = newStatuses;
 
-    let noteText = `${sensorId} status changed from "${oldStatus}" to "${newStatus}".`;
+    let noteText = `${sensorId} status changed from "${oldStr}" to "${newStr}".`;
 
     const mentionedContacts = parseMentionedContacts(additionalInfo);
 
@@ -422,6 +561,7 @@ function saveStatusChange(e) {
         type: 'Status Change',
         text: noteText,
         additionalInfo: additionalInfo || '',
+        createdBy: getCurrentUserName(),
         taggedSensors: [sensorId],
         taggedCommunities: s.community ? [s.community] : [],
         taggedContacts: mentionedContacts,
@@ -475,6 +615,7 @@ function moveSensor(e) {
         type: 'Movement',
         text: noteText,
         additionalInfo: additionalInfo || '',
+        createdBy: getCurrentUserName(),
         taggedSensors: [sensorId],
         taggedCommunities: taggedCommunities,
         taggedContacts: mentionedContacts,
@@ -497,7 +638,7 @@ function showSensorDetail(sensorId) {
     document.getElementById('sensor-info-card').innerHTML = `
         <div class="info-item"><label>Type</label><p>${s.type}</p></div>
         <div class="info-item"><label>SOA Tag ID</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'soaTagId')">${s.soaTagId || '—'}</p></div>
-        <div class="info-item"><label>Status</label><p><span class="badge ${getStatusBadgeClass(s.status)} badge-clickable" onclick="openStatusChangeModal('${s.id}')">${s.status}</span></p></div>
+        <div class="info-item"><label>Status</label><p>${renderStatusBadges(s, true)}</p></div>
         <div class="info-item"><label>Community</label><p><span class="editable-field" onclick="openInlineCommunityChange('${s.id}')">${getCommunityName(s.community)}</span></p><a class="move-sensor-link" onclick="openMoveSensorModal('${s.id}')">Move Sensor &rarr;</a></div>
         <div class="info-item"><label>Location</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'location')">${s.location || '—'}</p></div>
         <div class="info-item"><label>Purchase Date</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'datePurchased')">${s.datePurchased || '—'}</p></div>
@@ -550,7 +691,12 @@ function showCommunity(communityId) {
     currentCommunity = communityId;
 
     document.getElementById('community-name').textContent = community.name;
-    document.getElementById('community-type-badge').textContent = community.type;
+    const tags = getCommunityTags(communityId);
+    const badgeContainer = document.getElementById('community-type-badge');
+    badgeContainer.innerHTML = tags.map(t =>
+        `<span class="community-type-badge clickable-badge" onclick="filterCommunitiesByTag('${t}')">${t}</span>`
+    ).join(' ') +
+    ` <span class="community-tag-edit" onclick="openEditCommunityTags('${communityId}')">+ Edit Tags</span>`;
 
     document.querySelectorAll('.community-list a').forEach(a => a.classList.remove('active'));
     const link = document.querySelector(`.community-list a[data-community="${communityId}"]`);
@@ -563,7 +709,7 @@ function showCommunity(communityId) {
         <tr>
             <td><span class="clickable" onclick="showSensorDetail('${s.id}')">${s.id}</span><br><small style="color:#888">${s.type}</small></td>
             <td>${s.soaTagId || '—'}</td>
-            <td><span class="badge ${getStatusBadgeClass(s.status)} badge-clickable" onclick="openStatusChangeModal('${s.id}')">${s.status}</span></td>
+            <td>${renderStatusBadges(s, true)}</td>
             <td>${s.location || '—'}</td>
             <td>${s.datePurchased || '—'}</td>
             <td>${s.collocationDates || '—'}</td>
@@ -909,6 +1055,7 @@ function sendEmail() {
         subject: subject,
         fullBody: body,
         text: `[Email] Subject: ${subject}`,
+        createdBy: getCurrentUserName(),
         community: involvedCommunities[0] || '',
         taggedContacts: selectedContactIds,
         taggedCommunities: involvedCommunities,
@@ -985,6 +1132,7 @@ function saveNote(e) {
         date: noteDate,
         type: type,
         text: text,
+        createdBy: getCurrentUserName(),
         taggedSensors: sensorTags,
         taggedCommunities: communityTags,
         taggedContacts: contactTags,
@@ -1027,6 +1175,7 @@ function saveComm(e) {
         type: 'Communication',
         commType: commType,
         text: `[${commType}] ${text}`,
+        createdBy: getCurrentUserName(),
         community: communityId,
         taggedContacts: taggedContacts,
         taggedCommunities: [communityId],
@@ -1059,6 +1208,10 @@ function renderTimeline(containerId, items) {
             ? `<div class="timeline-additional-info"><em>${highlightMentions(item.additionalInfo)}</em></div>`
             : '';
 
+        const attribution = item.createdBy
+            ? `<div class="timeline-attribution">Changed by ${item.createdBy}, ${formatDate(item.date)}</div>`
+            : '';
+
         return `
             <div class="timeline-item ${typeClass}" ${expandable}>
                 <div class="timeline-date">${formatDate(item.date)}</div>
@@ -1066,6 +1219,7 @@ function renderTimeline(containerId, items) {
                 <div class="timeline-text">${highlightMentions(item.text)}${hasFullBody ? ' <small style="color:#2563eb">(click to expand)</small>' : ''}</div>
                 ${additionalInfoHtml}
                 ${hasFullBody ? `<div class="timeline-text-full">${item.fullBody}</div>` : ''}
+                ${attribution}
                 ${tags ? `<div class="timeline-tags">${tags}</div>` : ''}
             </div>
         `;
@@ -1238,6 +1392,133 @@ function parseMentionedContacts(text) {
         if (contact && !mentioned.includes(contact.id)) mentioned.push(contact.id);
     }
     return mentioned;
+}
+
+// ===== COMMUNITY TAG EDITING =====
+let editingTagsCommunity = null;
+
+function openEditCommunityTags(communityId) {
+    editingTagsCommunity = communityId;
+    const community = COMMUNITIES.find(c => c.id === communityId);
+    document.getElementById('edit-tags-community-name').textContent = community.name;
+    document.getElementById('custom-tag-input').value = '';
+    renderEditTagsList();
+    openModal('modal-edit-community-tags');
+}
+
+function renderEditTagsList() {
+    const current = getCommunityTags(editingTagsCommunity);
+    // Combine available tags with any custom tags already on this community
+    const allTags = [...new Set([...AVAILABLE_TAGS, ...current])];
+
+    document.getElementById('edit-tags-list').innerHTML = allTags.map(tag => {
+        const isActive = current.includes(tag);
+        return `<span class="edit-tag-option ${isActive ? 'active' : ''}" onclick="toggleCommunityTag('${tag}')">${tag}</span>`;
+    }).join('');
+}
+
+function toggleCommunityTag(tag) {
+    if (!editingTagsCommunity) return;
+    const current = getCommunityTags(editingTagsCommunity);
+    const community = COMMUNITIES.find(c => c.id === editingTagsCommunity);
+
+    if (current.includes(tag)) {
+        // Remove tag
+        communityTags[editingTagsCommunity] = current.filter(t => t !== tag);
+
+        const note = {
+            id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+            date: nowDatetime(),
+            type: 'Info Edit',
+            text: `Tag "${tag}" removed from ${community.name}.`,
+            createdBy: getCurrentUserName(),
+            taggedSensors: [],
+            taggedCommunities: [editingTagsCommunity],
+            taggedContacts: [],
+        };
+        notes.push(note);
+    } else {
+        // Add tag
+        if (!communityTags[editingTagsCommunity]) communityTags[editingTagsCommunity] = [];
+        communityTags[editingTagsCommunity].push(tag);
+
+        const note = {
+            id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+            date: nowDatetime(),
+            type: 'Info Edit',
+            text: `Tag "${tag}" added to ${community.name}.`,
+            createdBy: getCurrentUserName(),
+            taggedSensors: [],
+            taggedCommunities: [editingTagsCommunity],
+            taggedContacts: [],
+        };
+        notes.push(note);
+    }
+
+    persist();
+    renderEditTagsList();
+    // Refresh community view if it's showing
+    if (currentCommunity === editingTagsCommunity) showCommunity(editingTagsCommunity);
+}
+
+function addCustomTag() {
+    const input = document.getElementById('custom-tag-input');
+    const tag = input.value.trim();
+    if (!tag || !editingTagsCommunity) return;
+
+    // Add to AVAILABLE_TAGS if not already there
+    if (!AVAILABLE_TAGS.includes(tag)) AVAILABLE_TAGS.push(tag);
+
+    const current = getCommunityTags(editingTagsCommunity);
+    if (!current.includes(tag)) {
+        if (!communityTags[editingTagsCommunity]) communityTags[editingTagsCommunity] = [];
+        communityTags[editingTagsCommunity].push(tag);
+
+        const community = COMMUNITIES.find(c => c.id === editingTagsCommunity);
+        const note = {
+            id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+            date: nowDatetime(),
+            type: 'Info Edit',
+            text: `Tag "${tag}" added to ${community.name}.`,
+            createdBy: getCurrentUserName(),
+            taggedSensors: [],
+            taggedCommunities: [editingTagsCommunity],
+            taggedContacts: [],
+        };
+        notes.push(note);
+        persist();
+    }
+
+    input.value = '';
+    renderEditTagsList();
+    if (currentCommunity === editingTagsCommunity) showCommunity(editingTagsCommunity);
+}
+
+// ===== STATUS TOGGLE LIST =====
+const ALL_STATUSES = [
+    'Online', 'Offline', 'In Transit', 'Service at Quant', 'Collocation',
+    'Auditing a Community', 'Lab Storage', 'Needs Repair', 'Ready for Deployment',
+    'PM Sensor Issue', 'Gaseous Sensor Issue', 'SD Card Issue'
+];
+
+function renderStatusToggleList(containerId, selectedStatuses) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = ALL_STATUSES.map(st => {
+        const isActive = selectedStatuses.includes(st);
+        const badgeClass = getStatusBadgeClass(st);
+        return `<span class="status-toggle-option ${isActive ? 'active' : ''}" data-status="${st}" onclick="toggleStatusOption(this)">
+            <span class="badge ${badgeClass}" style="pointer-events:none">${st}</span>
+        </span>`;
+    }).join('');
+}
+
+function toggleStatusOption(el) {
+    el.classList.toggle('active');
+}
+
+function getSelectedStatuses(containerId) {
+    const container = document.getElementById(containerId);
+    return Array.from(container.querySelectorAll('.status-toggle-option.active')).map(el => el.dataset.status);
 }
 
 function filterSensorHistory() {
@@ -1422,7 +1703,14 @@ function populateCommunitySelect(selectId) {
 
 // ===== INIT =====
 buildSidebar();
-showView('dashboard');
+
+// Check if user is already logged in
+const savedUser = loadData('currentUser', null);
+if (savedUser) {
+    loginUser(savedUser);
+} else {
+    showLoginScreen();
+}
 
 // Set up all mention autocomplete textareas
 document.addEventListener('DOMContentLoaded', () => {

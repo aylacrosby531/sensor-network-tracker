@@ -7,7 +7,20 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="app">
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-screen">
+        <div class="login-card">
+            <h2>ADEC Sensor Network Tracker</h2>
+            <p>Sign in to continue</p>
+            <div id="login-user-list"></div>
+            <div class="login-add-user">
+                <input type="text" id="login-new-name" placeholder="Enter your full name">
+                <button class="btn btn-primary" onclick="addAndLoginUser()">Sign In</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" style="display:none">
         <!-- Sidebar -->
         <nav id="sidebar">
             <div class="sidebar-header">
@@ -16,6 +29,7 @@
                      onerror="this.style.display='none'">
                 <h2>Alaska Department of Environmental Conservation</h2>
             </div>
+            <div class="sidebar-user" id="sidebar-user" onclick="logoutUser()"></div>
             <ul class="sidebar-menu">
                 <li>
                     <a href="#" class="menu-item" data-view="dashboard">
@@ -72,11 +86,16 @@
                         <option value="">All Statuses</option>
                         <option value="Online">Online</option>
                         <option value="Offline">Offline</option>
-                        <option value="Collocation">Collocation</option>
-                        <option value="PM Sensor Issue">PM Sensor Issue</option>
-                        <option value="In Storage">In Storage</option>
                         <option value="In Transit">In Transit</option>
-                        <option value="Servicing">Servicing</option>
+                        <option value="Service at Quant">Service at Quant</option>
+                        <option value="Collocation">Collocation</option>
+                        <option value="Auditing a Community">Auditing a Community</option>
+                        <option value="Lab Storage">Lab Storage</option>
+                        <option value="Needs Repair">Needs Repair</option>
+                        <option value="Ready for Deployment">Ready for Deployment</option>
+                        <option value="PM Sensor Issue">PM Sensor Issue</option>
+                        <option value="Gaseous Sensor Issue">Gaseous Sensor Issue</option>
+                        <option value="SD Card Issue">SD Card Issue</option>
                     </select>
                 </div>
                 <div class="table-container">
@@ -113,7 +132,7 @@
             <div id="view-community" class="view">
                 <div class="view-header">
                     <h1 id="community-name"></h1>
-                    <span class="community-type-badge" id="community-type-badge"></span>
+                    <div class="community-tags-container" id="community-type-badge"></div>
                 </div>
 
                 <div class="tabs">
@@ -259,16 +278,8 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Status</label>
-                    <select id="sensor-status-input">
-                        <option value="Online">Online</option>
-                        <option value="Offline">Offline</option>
-                        <option value="Collocation">Collocation</option>
-                        <option value="PM Sensor Issue">PM Sensor Issue</option>
-                        <option value="In Storage">In Storage</option>
-                        <option value="In Transit">In Transit</option>
-                        <option value="Servicing">Servicing</option>
-                    </select>
+                    <label>Status (click to toggle)</label>
+                    <div id="sensor-status-input" class="status-toggle-list"></div>
                 </div>
                 <div class="form-group">
                     <label>Current Community</label>
@@ -347,15 +358,7 @@
                 </div>
                 <div class="form-group">
                     <label>New Status</label>
-                    <select id="status-change-new" required>
-                        <option value="Online">Online</option>
-                        <option value="Offline">Offline</option>
-                        <option value="Collocation">Collocation</option>
-                        <option value="PM Sensor Issue">PM Sensor Issue</option>
-                        <option value="In Storage">In Storage</option>
-                        <option value="In Transit">In Transit</option>
-                        <option value="Servicing">Servicing</option>
-                    </select>
+                    <div id="status-change-new" class="status-toggle-list"></div>
                 </div>
                 <div class="form-group">
                     <label>Date</label>
@@ -551,6 +554,30 @@
                     <button type="button" class="btn" onclick="closeModal('modal-email')">Cancel</button>
                     <button type="button" class="btn btn-primary" onclick="sendEmail()">Draft &amp; Send in Outlook</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Community Tags Modal -->
+    <div id="modal-edit-community-tags" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>Edit Tags — <span id="edit-tags-community-name"></span></h2>
+                <button class="modal-close" onclick="closeModal('modal-edit-community-tags')">&times;</button>
+            </div>
+            <div class="form-group" style="margin-top:16px">
+                <label>Tags (click to add/remove)</label>
+                <div id="edit-tags-list" class="edit-tags-list"></div>
+            </div>
+            <div class="form-group">
+                <label>Add Custom Tag</label>
+                <div style="display:flex;gap:8px">
+                    <input type="text" id="custom-tag-input" placeholder="e.g. Western Alaska Network">
+                    <button class="btn btn-primary btn-sm" onclick="addCustomTag()" style="white-space:nowrap">Add</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="closeModal('modal-edit-community-tags')">Done</button>
             </div>
         </div>
     </div>
