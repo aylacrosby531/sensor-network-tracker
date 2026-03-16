@@ -290,7 +290,7 @@ async function enterApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     document.getElementById('sidebar-user').innerHTML =
-        `<span class="user-name">${currentUser}</span><span class="user-logout">Sign out</span>`;
+        `<span class="user-name">${currentUser}</span><span class="sidebar-user-actions"><span class="sidebar-settings-btn" onclick="event.stopPropagation(); showView('settings')" title="Settings">&#9881;</span><span class="user-logout" onclick="logoutUser()">Sign out</span></span>`;
     renderSetupModeIndicator();
     buildSidebar();
     restoreLastView();
@@ -512,7 +512,6 @@ document.querySelectorAll('.menu-item[data-view]').forEach(item => {
         if (view === 'dashboard') showView('dashboard');
         if (view === 'all-sensors') showView('all-sensors');
         if (view === 'contacts') showView('contacts');
-        if (view === 'settings') showView('settings');
         if (view === 'communities') return; // handled by community-menu-item listener
     });
 });
