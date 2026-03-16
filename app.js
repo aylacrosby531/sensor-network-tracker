@@ -191,6 +191,7 @@ function showSignUpForm() {
 function showSignInForm() {
     document.getElementById('login-form-section').style.display = '';
     document.getElementById('signup-form-section').style.display = 'none';
+    document.getElementById('mfa-challenge-section').style.display = 'none';
     hideLoginError();
 }
 
@@ -211,10 +212,49 @@ async function handleSignIn() {
     if (!email || !password) { showLoginError('Please enter email and password.'); return; }
 
     try {
-        await db.signIn(email, password);
+        const result = await db.signIn(email, password);
+
+        // Check if MFA is required
+        if (result.data?.session === null && result.data?.user === null) {
+            // MFA challenge needed
+            showMfaChallenge();
+            return;
+        }
+
         await enterApp();
     } catch (err) {
+        // Supabase returns a specific error for MFA
+        if (err.message && err.message.includes('mfa')) {
+            showMfaChallenge();
+            return;
+        }
         showLoginError(err.message || 'Sign in failed.');
+    }
+}
+
+function showMfaChallenge() {
+    document.getElementById('login-form-section').style.display = 'none';
+    document.getElementById('signup-form-section').style.display = 'none';
+    document.getElementById('mfa-challenge-section').style.display = '';
+}
+
+async function handleMfaVerify() {
+    hideLoginError();
+    const code = document.getElementById('mfa-challenge-code').value.trim();
+    if (!code || code.length !== 6) { showLoginError('Enter your 6-digit code.'); return; }
+
+    try {
+        const { data: factors } = await supa.auth.mfa.listFactors();
+        const totp = factors?.totp?.[0];
+        if (!totp) { showLoginError('No MFA factor found.'); return; }
+
+        const { data: challenge } = await supa.auth.mfa.challenge({ factorId: totp.id });
+        const { error } = await supa.auth.mfa.verify({ factorId: totp.id, challengeId: challenge.id, code });
+        if (error) { showLoginError('Invalid code. Try again.'); return; }
+
+        await enterApp();
+    } catch (err) {
+        showLoginError(err.message || 'MFA verification failed.');
     }
 }
 
@@ -472,6 +512,7 @@ document.querySelectorAll('.menu-item[data-view]').forEach(item => {
         if (view === 'dashboard') showView('dashboard');
         if (view === 'all-sensors') showView('all-sensors');
         if (view === 'contacts') showView('contacts');
+        if (view === 'settings') showView('settings');
         if (view === 'communities') return; // handled by community-menu-item listener
     });
 });
@@ -524,6 +565,7 @@ function showView(viewName) {
     if (viewName === 'all-sensors') renderSensors();
     if (viewName === 'contacts') renderContacts();
     if (viewName === 'communities') renderCommunitiesList();
+    if (viewName === 'settings') renderSettings();
 
     saveLastView('view', viewName);
 }
@@ -2704,6 +2746,123 @@ function populateGroupedCommunitySelect(selectId) {
 
     select.innerHTML = options;
     if (currentVal) select.value = currentVal;
+}
+
+// ===== SETTINGS & USER MANAGEMENT =====
+async function renderSettings() {
+    const profile = await db.getProfile();
+    const session = await db.getSession();
+    const userEmail = session?.user?.email || '';
+
+    document.getElementById('settings-profile').innerHTML = `
+        <div class="info-item"><label>Name</label><p>${profile?.name || '—'}</p></div>
+        <div class="info-item"><label>Email</label><p>${userEmail}</p></div>
+    `;
+
+    await renderAllowedUsers(userEmail);
+    await renderMfaSettings();
+}
+
+async function renderAllowedUsers(currentEmail) {
+    const { data, error } = await supa.from('allowed_emails').select('*').order('email');
+    if (error) { console.error(error); return; }
+
+    const container = document.getElementById('settings-users-list');
+    container.innerHTML = (data || []).map(row => {
+        const isYou = row.email.toLowerCase() === currentEmail.toLowerCase();
+        return `<div class="settings-user-row">
+            <span>
+                <span class="settings-user-email">${row.email}</span>
+                ${isYou ? '<span class="settings-user-you">(you)</span>' : ''}
+            </span>
+            ${!isYou ? `<button class="btn btn-sm btn-danger" onclick="removeAllowedEmail('${row.id}')">Remove</button>` : ''}
+        </div>`;
+    }).join('');
+}
+
+async function addAllowedEmail() {
+    const input = document.getElementById('settings-add-email');
+    const email = input.value.trim().toLowerCase();
+    if (!email) return;
+
+    const { error } = await supa.from('allowed_emails').insert({ email });
+    if (error) {
+        alert(error.message.includes('duplicate') ? 'That email is already added.' : error.message);
+        return;
+    }
+
+    input.value = '';
+    const session = await db.getSession();
+    await renderAllowedUsers(session?.user?.email || '');
+}
+
+async function removeAllowedEmail(id) {
+    if (!confirm('Remove this email? They will no longer be able to sign in.')) return;
+
+    const { error } = await supa.from('allowed_emails').delete().eq('id', id);
+    if (error) { alert(error.message); return; }
+
+    const session = await db.getSession();
+    await renderAllowedUsers(session?.user?.email || '');
+}
+
+// ===== MFA =====
+async function renderMfaSettings() {
+    const { data: factors } = await supa.auth.mfa.listFactors();
+    const totp = factors?.totp?.[0];
+    const container = document.getElementById('settings-mfa');
+
+    if (totp && totp.status === 'verified') {
+        container.innerHTML = `
+            <p style="color:var(--aurora-green);font-weight:600;margin-bottom:12px">MFA is enabled</p>
+            <button class="btn btn-danger" onclick="disableMfa('${totp.id}')">Disable MFA</button>
+        `;
+    } else {
+        container.innerHTML = `
+            <p style="margin-bottom:12px">Add an extra layer of security with an authenticator app (Google Authenticator, Authy, etc.)</p>
+            <button class="btn btn-primary" onclick="startMfaSetup()">Enable MFA</button>
+            <div id="mfa-setup-area"></div>
+        `;
+    }
+}
+
+async function startMfaSetup() {
+    const { data, error } = await supa.auth.mfa.enroll({ factorType: 'totp' });
+    if (error) { alert(error.message); return; }
+
+    const area = document.getElementById('mfa-setup-area');
+    area.innerHTML = `
+        <div class="mfa-setup-container">
+            <p style="margin:16px 0 8px;font-weight:500">Scan this QR code with your authenticator app:</p>
+            <div class="mfa-qr-code">
+                <img src="${data.totp.qr_code}" alt="MFA QR Code" style="width:200px;height:200px">
+            </div>
+            <p style="font-size:12px;color:var(--slate-400);margin:8px 0">Or enter this code manually: <code style="font-family:var(--font-mono);color:var(--slate-700)">${data.totp.secret}</code></p>
+            <div class="mfa-verify-field">
+                <input type="text" id="mfa-verify-code" placeholder="000000" maxlength="6">
+                <button class="btn btn-primary" onclick="verifyMfa('${data.id}')">Verify</button>
+            </div>
+        </div>
+    `;
+}
+
+async function verifyMfa(factorId) {
+    const code = document.getElementById('mfa-verify-code').value.trim();
+    if (!code || code.length !== 6) { alert('Enter the 6-digit code from your authenticator app.'); return; }
+
+    const { data: challenge } = await supa.auth.mfa.challenge({ factorId });
+    const { error } = await supa.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
+
+    if (error) { alert('Invalid code. Try again.'); return; }
+    alert('MFA enabled successfully!');
+    await renderMfaSettings();
+}
+
+async function disableMfa(factorId) {
+    if (!confirm('Disable MFA? Your account will only be protected by your password.')) return;
+    const { error } = await supa.auth.mfa.unenroll({ factorId });
+    if (error) { alert(error.message); return; }
+    await renderMfaSettings();
 }
 
 // ===== INIT =====

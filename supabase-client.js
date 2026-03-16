@@ -33,9 +33,9 @@ const db = {
     },
 
     async signIn(email, password) {
-        const { data, error } = await supa.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        return data;
+        const result = await supa.auth.signInWithPassword({ email, password });
+        if (result.error) throw result.error;
+        return result;
     },
 
     async signOut() {
