@@ -16,7 +16,10 @@ const db = {
         const { data, error } = await supa.auth.signUp({
             email,
             password,
-            options: { data: { name } }
+            options: {
+                data: { name },
+                emailRedirectTo: window.location.origin + window.location.pathname,
+            }
         });
         if (error) throw error;
 

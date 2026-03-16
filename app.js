@@ -2867,6 +2867,37 @@ async function disableMfa(factorId) {
 // ===== INIT =====
 // Check if user has an active Supabase session
 (async function init() {
+    // Handle auth redirects (email confirmation links, password resets)
+    const hash = window.location.hash;
+    if (hash && (hash.includes('access_token') || hash.includes('type=signup') || hash.includes('type=recovery'))) {
+        // Supabase puts tokens in the URL hash after email confirmation
+        // The client picks them up automatically, just need to wait
+        const { data, error } = await supa.auth.getSession();
+        if (data?.session) {
+            // Clean up the URL
+            window.history.replaceState(null, '', window.location.pathname);
+            await enterApp();
+            return;
+        }
+    }
+
+    // Also handle token in query params (some Supabase versions use this)
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('token_hash') || params.has('type')) {
+        const { error } = await supa.auth.verifyOtp({
+            token_hash: params.get('token_hash'),
+            type: params.get('type'),
+        });
+        if (!error) {
+            window.history.replaceState(null, '', window.location.pathname);
+            const session = await db.getSession();
+            if (session) {
+                await enterApp();
+                return;
+            }
+        }
+    }
+
     const session = await db.getSession();
     if (session) {
         await enterApp();
