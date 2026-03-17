@@ -110,6 +110,10 @@
         <!-- Main content -->
         <div id="main-wrapper">
             <div id="open-tabs-bar" class="open-tabs-bar"></div>
+            <div class="global-search-bar">
+                <input type="text" id="global-search" placeholder="Search sensors, communities, contacts..." oninput="handleGlobalSearch()" autocomplete="off">
+                <div id="global-search-results" class="global-search-results"></div>
+            </div>
             <main id="main-content">
             <div id="back-button" class="back-button" style="display:none" onclick="goBack()">&#8592; Back</div>
             <!-- Dashboard View -->
@@ -127,6 +131,8 @@
                 <div class="view-header">
                     <h1>All Sensors</h1>
                     <button class="btn btn-primary" onclick="openAddSensorModal()">+ Add Sensor</button>
+                    <button class="btn" onclick="exportSensorsCSV()">Export CSV</button>
+                    <button class="btn" id="bulk-action-btn" style="display:none" onclick="openBulkActionModal()">Bulk Action (<span id="bulk-count">0</span>)</button>
                 </div>
                 <div class="filter-bar">
                     <input type="text" id="sensor-search" placeholder="Search sensors..." oninput="renderSensors()">
@@ -150,6 +156,7 @@
                     <table id="sensors-table">
                         <thead>
                             <tr>
+                                <th style="width:30px"><input type="checkbox" id="select-all-sensors" onchange="toggleAllSensorCheckboxes(this.checked)"></th>
                                 <th>Sensor ID</th>
                                 <th>SOA Tag ID</th>
                                 <th>Status</th>
@@ -243,6 +250,7 @@
                     <h1>All Contacts</h1>
                     <button class="btn btn-primary" onclick="openAddContactModal()">+ Add Contact</button>
                     <button class="btn btn-primary" onclick="openEmailModal()">&#9993; Email</button>
+                    <button class="btn" onclick="exportContactsCSV()">Export CSV</button>
                 </div>
                 <div class="filter-bar">
                     <input type="text" id="contact-search" placeholder="Search contacts..." oninput="renderContacts()">
@@ -751,6 +759,39 @@
             <div class="modal-footer">
                 <button type="button" class="btn" onclick="skipContactStatusNote()">Skip</button>
                 <button type="button" class="btn btn-primary" onclick="saveContactStatusNote()">Save Note</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Action Modal -->
+    <div id="modal-bulk-action" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Bulk Action — <span id="bulk-action-count">0</span> sensors selected</h2>
+                <button class="modal-close" onclick="closeModal('modal-bulk-action')">&times;</button>
+            </div>
+            <div class="form-group" style="margin-top:16px">
+                <label>Action</label>
+                <select id="bulk-action-type" onchange="toggleBulkFields()">
+                    <option value="move">Move to Community</option>
+                    <option value="status">Change Status</option>
+                </select>
+            </div>
+            <div class="form-group" id="bulk-move-field">
+                <label>Move To Community</label>
+                <select id="bulk-move-community"></select>
+            </div>
+            <div class="form-group" id="bulk-status-field" style="display:none">
+                <label>Set Status</label>
+                <div id="bulk-status-list" class="status-toggle-list"></div>
+            </div>
+            <div class="form-group" id="bulk-notes-field">
+                <label>Notes (optional — logged as a single group event)</label>
+                <textarea id="bulk-action-notes" rows="3" placeholder="e.g. Deployed 3 sensors to Garden for spring monitoring"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('modal-bulk-action')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="executeBulkAction()">Apply</button>
             </div>
         </div>
     </div>

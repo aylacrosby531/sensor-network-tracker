@@ -884,6 +884,7 @@ function renderSensors() {
     } else {
         document.getElementById('sensors-tbody').innerHTML = filtered.map(s => `
             <tr>
+                <td><input type="checkbox" class="sensor-checkbox" data-sensor-id="${s.id}" onchange="toggleSensorCheckbox('${s.id}', this.checked)" ${selectedSensors.has(s.id) ? 'checked' : ''}></td>
                 <td><span class="clickable" onclick="showSensorDetail('${s.id}')">${s.id}</span><br><small style="color:#888">${s.type}</small></td>
                 <td>${s.soaTagId || '—'}</td>
                 <td>${renderStatusBadges(s, true)}</td>
@@ -897,7 +898,7 @@ function renderSensors() {
                     <button class="btn btn-sm" onclick="openMoveSensorModal('${s.id}')">Move</button>
                 </td>
             </tr>
-        `).join('') || '<tr><td colspan="9" class="empty-state">No sensors found.</td></tr>';
+        `).join('') || '<tr><td colspan="10" class="empty-state">No sensors found.</td></tr>';
     }
 }
 
@@ -3082,6 +3083,236 @@ async function disableMfa(factorId) {
     const { error } = await supa.auth.mfa.unenroll({ factorId });
     if (error) { alert(error.message); return; }
     await renderMfaSettings();
+}
+
+// ===== GLOBAL SEARCH =====
+function handleGlobalSearch() {
+    const query = document.getElementById('global-search').value.trim().toLowerCase();
+    const results = document.getElementById('global-search-results');
+
+    if (query.length < 2) {
+        results.classList.remove('visible');
+        return;
+    }
+
+    const matchedSensors = sensors.filter(s =>
+        s.id.toLowerCase().includes(query) || (s.soaTagId || '').toLowerCase().includes(query)
+    ).slice(0, 5);
+
+    const matchedCommunities = COMMUNITIES.filter(c =>
+        c.name.toLowerCase().includes(query)
+    ).slice(0, 5);
+
+    const matchedContacts = contacts.filter(c =>
+        c.name.toLowerCase().includes(query) || (c.org || '').toLowerCase().includes(query) || (c.email || '').toLowerCase().includes(query)
+    ).slice(0, 5);
+
+    if (!matchedSensors.length && !matchedCommunities.length && !matchedContacts.length) {
+        results.innerHTML = '<div style="padding:16px;color:var(--slate-400);text-align:center;font-size:13px">No results found</div>';
+        results.classList.add('visible');
+        return;
+    }
+
+    let html = '';
+    if (matchedSensors.length) {
+        html += `<div class="search-result-group"><div class="search-result-group-label">Sensors</div>
+            ${matchedSensors.map(s => `<div class="search-result-item" onclick="closeGlobalSearch(); showSensorDetail('${s.id}')">
+                <span class="search-result-name" style="font-family:var(--font-mono)">${s.id}</span>
+                <span class="search-result-meta">${getCommunityName(s.community)} &middot; ${s.type}</span>
+            </div>`).join('')}</div>`;
+    }
+    if (matchedCommunities.length) {
+        html += `<div class="search-result-group"><div class="search-result-group-label">Communities</div>
+            ${matchedCommunities.map(c => `<div class="search-result-item" onclick="closeGlobalSearch(); showCommunity('${c.id}')">
+                <span class="search-result-name">${c.name}</span>
+                <span class="search-result-meta">${getChildCommunities(c.id).length ? getChildCommunities(c.id).length + ' sub-communities' : ''}</span>
+            </div>`).join('')}</div>`;
+    }
+    if (matchedContacts.length) {
+        html += `<div class="search-result-group"><div class="search-result-group-label">Contacts</div>
+            ${matchedContacts.map(c => `<div class="search-result-item" onclick="closeGlobalSearch(); showContactDetail('${c.id}')">
+                <span class="search-result-name">${c.name}</span>
+                <span class="search-result-meta">${getCommunityName(c.community)}${c.active === false ? ' &middot; Inactive' : ''}</span>
+            </div>`).join('')}</div>`;
+    }
+
+    results.innerHTML = html;
+    results.classList.add('visible');
+}
+
+function closeGlobalSearch() {
+    document.getElementById('global-search').value = '';
+    document.getElementById('global-search-results').classList.remove('visible');
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.global-search-bar')) {
+        document.getElementById('global-search-results').classList.remove('visible');
+    }
+});
+
+// ===== EXPORT CSV =====
+function exportSensorsCSV() {
+    const headers = ['Sensor ID', 'SOA Tag ID', 'Type', 'Status', 'Community', 'Location', 'Install Date', 'Purchase Date', 'Collocation Dates'];
+    const rows = sensors.sort((a, b) => a.id.localeCompare(b.id)).map(s => [
+        s.id,
+        s.soaTagId || '',
+        s.type,
+        getStatusArray(s).join('; '),
+        getCommunityName(s.community),
+        s.location || '',
+        s.dateInstalled || '',
+        s.datePurchased || '',
+        s.collocationDates || '',
+    ]);
+
+    const csv = [headers, ...rows].map(row =>
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sensors_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportContactsCSV() {
+    const headers = ['Name', 'Role', 'Community', 'Organization', 'Email', 'Phone', 'Status'];
+    const rows = contacts.sort((a, b) => a.name.localeCompare(b.name)).map(c => [
+        c.name,
+        c.role || '',
+        getCommunityName(c.community),
+        c.org || '',
+        c.email || '',
+        c.phone || '',
+        c.active === false ? 'Inactive' : 'Active',
+    ]);
+
+    const csv = [headers, ...rows].map(row =>
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contacts_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ===== BULK ACTIONS =====
+let selectedSensors = new Set();
+
+function toggleSensorCheckbox(sensorId, checked) {
+    if (checked) selectedSensors.add(sensorId);
+    else selectedSensors.delete(sensorId);
+    updateBulkActionButton();
+}
+
+function toggleAllSensorCheckboxes(checked) {
+    document.querySelectorAll('.sensor-checkbox').forEach(cb => {
+        cb.checked = checked;
+        const sensorId = cb.dataset.sensorId;
+        if (checked) selectedSensors.add(sensorId);
+        else selectedSensors.delete(sensorId);
+    });
+    updateBulkActionButton();
+}
+
+function updateBulkActionButton() {
+    const btn = document.getElementById('bulk-action-btn');
+    const count = selectedSensors.size;
+    document.getElementById('bulk-count').textContent = count;
+    btn.style.display = count > 0 ? '' : 'none';
+}
+
+function openBulkActionModal() {
+    if (selectedSensors.size === 0) return;
+    document.getElementById('bulk-action-count').textContent = selectedSensors.size;
+    populateGroupedCommunitySelect('bulk-move-community');
+    renderStatusToggleList('bulk-status-list', []);
+    document.getElementById('bulk-action-notes').value = '';
+    document.getElementById('bulk-action-type').value = 'move';
+    toggleBulkFields();
+    openModal('modal-bulk-action');
+}
+
+function toggleBulkFields() {
+    const action = document.getElementById('bulk-action-type').value;
+    document.getElementById('bulk-move-field').style.display = action === 'move' ? '' : 'none';
+    document.getElementById('bulk-status-field').style.display = action === 'status' ? '' : 'none';
+}
+
+function executeBulkAction() {
+    const action = document.getElementById('bulk-action-type').value;
+    const userNotes = document.getElementById('bulk-action-notes').value.trim();
+    const sensorIds = Array.from(selectedSensors);
+    const sensorList = sensorIds.join(', ');
+    const now = nowDatetime();
+
+    if (action === 'move') {
+        const toCommunityId = document.getElementById('bulk-move-community').value;
+        if (!toCommunityId) { alert('Select a community.'); return; }
+        const toName = getCommunityName(toCommunityId);
+
+        sensorIds.forEach(id => {
+            const s = sensors.find(x => x.id === id);
+            if (!s) return;
+            s.community = toCommunityId;
+            s.dateInstalled = now.split('T')[0];
+            persistSensor(s);
+        });
+
+        if (!setupMode) {
+            const noteText = `Bulk move: ${sensorList} moved to ${toName}.${userNotes ? ' ' + userNotes : ''}`;
+            const note = {
+                id: 'n' + Date.now(),
+                date: now,
+                type: 'Movement',
+                text: noteText,
+                createdBy: getCurrentUserName(),
+                taggedSensors: sensorIds,
+                taggedCommunities: [toCommunityId],
+                taggedContacts: [],
+            };
+            notes.push(note); persistNote(note);
+        }
+    } else if (action === 'status') {
+        const newStatuses = getSelectedStatuses('bulk-status-list');
+        if (newStatuses.length === 0) { alert('Select at least one status.'); return; }
+
+        sensorIds.forEach(id => {
+            const s = sensors.find(x => x.id === id);
+            if (!s) return;
+            s.status = newStatuses;
+            persistSensor(s);
+        });
+
+        if (!setupMode) {
+            const noteText = `Bulk status change: ${sensorList} set to ${newStatuses.join(', ')}.${userNotes ? ' ' + userNotes : ''}`;
+            const note = {
+                id: 'n' + Date.now(),
+                date: now,
+                type: 'Status Change',
+                text: noteText,
+                createdBy: getCurrentUserName(),
+                taggedSensors: sensorIds,
+                taggedCommunities: [],
+                taggedContacts: [],
+            };
+            notes.push(note); persistNote(note);
+        }
+    }
+
+    selectedSensors.clear();
+    document.getElementById('select-all-sensors').checked = false;
+    closeModal('modal-bulk-action');
+    renderSensors();
+    updateBulkActionButton();
 }
 
 // ===== BACK BUTTON =====
