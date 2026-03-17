@@ -96,6 +96,10 @@
                         <span class="icon">&#9787;</span> Contacts
                     </a>
                 </li>
+                <li id="sidebar-pinned-section" style="display:none">
+                    <div class="sidebar-pinned-header">Pinned</div>
+                    <ul class="sidebar-pinned-list" id="sidebar-pinned-list"></ul>
+                </li>
             </ul>
             <div id="setup-mode-toggle" class="setup-mode-toggle" onclick="toggleSetupMode()">
                 <span class="setup-mode-icon">&#9881;</span>
@@ -107,6 +111,7 @@
         <div id="main-wrapper">
             <div id="open-tabs-bar" class="open-tabs-bar"></div>
             <main id="main-content">
+            <div id="back-button" class="back-button" style="display:none" onclick="goBack()">&#8592; Back</div>
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
                 <iframe
@@ -181,7 +186,11 @@
                         <h1 id="community-name"></h1>
                         <div class="community-tags-container" id="community-type-badge"></div>
                     </div>
-                    <a class="add-sub-community-link" id="add-sub-community-btn" onclick="openAddSubCommunityModal(currentCommunity)">+ Add Sub-Community</a>
+                    <span class="community-detail-actions">
+                        <a class="add-sub-community-link" id="add-sub-community-btn" onclick="openAddSubCommunityModal(currentCommunity)">+ Sub-Community</a>
+                        <a class="add-sub-community-link" id="pin-community-btn" onclick="pinCommunity(currentCommunity)">&#9733; Pin</a>
+                        <a class="add-sub-community-link" style="color:var(--slate-400)" id="deactivate-community-btn" onclick="deactivateCommunity(currentCommunity)">Deactivate</a>
+                    </span>
                 </div>
 
                 <div class="tabs">
@@ -515,7 +524,7 @@
                     <select id="note-type-input">
                         <option value="General">General</option>
                         <option value="Audit">Audit / Collocation</option>
-                        <option value="Field Work">Field Work</option>
+                        <option value="Site Work">Site Work</option>
                         <option value="Issue">Issue</option>
                     </select>
                 </div>
@@ -708,6 +717,10 @@
                 <div class="form-group">
                     <label>Tags (optional)</label>
                     <div id="new-community-tags" class="edit-tags-list"></div>
+                    <div style="display:flex;gap:8px;margin-top:8px">
+                        <input type="text" id="new-community-custom-tag" placeholder="Add custom tag">
+                        <button type="button" class="btn btn-sm" onclick="addNewCommunityCustomTag()">Add</button>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeModal('modal-add-community')">Cancel</button>

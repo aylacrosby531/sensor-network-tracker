@@ -355,6 +355,7 @@ async function enterApp() {
         `<span class="user-name">${currentUser}</span><span class="sidebar-user-actions"><span class="sidebar-settings-btn" onclick="event.stopPropagation(); showView('settings')" title="Settings">&#9881;</span><span class="user-logout" onclick="logoutUser()">Sign out</span></span>`;
     renderSetupModeIndicator();
     buildSidebar();
+    renderPinnedSidebar();
     restoreLastView();
     startInactivityTimer();
 }
@@ -627,6 +628,7 @@ function restoreLastView() {
 function showView(viewName) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + viewName).classList.add('active');
+    pushViewHistory();
 
     document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
     const menuItem = document.querySelector(`.menu-item[data-view="${viewName}"]`);
@@ -757,17 +759,28 @@ function renderCommunitiesList() {
     } else {
         // Only render top-level communities (parents + standalone); children rendered inside parents
         const topLevel = filtered.filter(c => !isChildCommunity(c.id));
+        const activeTL = topLevel.filter(c => !isCommunityDeactivated(c.id));
+        const deactivatedTL = topLevel.filter(c => isCommunityDeactivated(c.id));
 
-        let html = topLevel.map(c => renderCommunityCard(c)).join('');
+        let html = activeTL.map(c => renderCommunityCard(c)).join('');
 
         // Orphaned children whose parent didn't pass filter
         const childrenInFilter = filtered.filter(c => isChildCommunity(c.id));
         childrenInFilter.forEach(child => {
             const parentInList = topLevel.find(p => p.id === communityParents[child.id]);
-            if (!parentInList) {
+            if (!parentInList && !isCommunityDeactivated(child.id)) {
                 html += renderCommunityCard(child);
             }
         });
+
+        // Deactivated at bottom
+        if (deactivatedTL.length > 0) {
+            html += '<div class="deactivated-section-header">Deactivated Communities</div>';
+            html += deactivatedTL.map(c => {
+                const card = renderCommunityCard(c);
+                return card.replace('class="community-row', 'class="community-row community-row-deactivated');
+            }).join('');
+        }
 
         container.innerHTML = html || '<div class="empty-state">No communities found.</div>';
     }
@@ -1321,7 +1334,7 @@ function showSensorView(sensorId) {
             <div class="info-item"><label>Status</label><p>${renderStatusBadges(s, true)}</p></div>
             <div class="info-item"><label>Community</label><p><span class="editable-field" onclick="openInlineCommunityChange('${s.id}')">${getCommunityName(s.community)}</span> <a class="move-sensor-link" onclick="openMoveSensorModal('${s.id}')">Move &rarr;</a></p></div>
             <div class="info-item"><label>Location</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'location')">${s.location || '—'}</p></div>
-            <div class="info-item"><label>Install Date</label><p>${s.dateInstalled || '—'}</p></div>
+            <div class="info-item"><label>Install Date</label><p>${s.dateInstalled || '—'} <a class="move-sensor-link" onclick="viewInstallHistory()">View history &rarr;</a></p></div>
             <div class="info-item"><label>Purchase Date</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'datePurchased')">${s.datePurchased || '—'}</p></div>
             <div class="info-item"><label>Collocation Dates</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'collocationDates')">${s.collocationDates || '—'}</p></div>
         `;
@@ -1337,6 +1350,7 @@ function showSensorView(sensorId) {
 
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-sensor-detail').classList.add('active');
+    pushViewHistory();
 }
 
 function inlineEditSensor(sensorId, field) {
@@ -1346,7 +1360,8 @@ function inlineEditSensor(sensorId, field) {
     const labels = { soaTagId: 'SOA Tag ID', location: 'Location', datePurchased: 'Purchase Date', collocationDates: 'Collocation Dates' };
     const label = labels[field] || field;
     const oldVal = s[field] || '';
-    const newVal = prompt(`Edit ${label}:`, oldVal);
+    const promptMsg = field === 'location' ? `Edit ${label} (enter an address or GPS coordinates):` : `Edit ${label}:`;
+    const newVal = prompt(promptMsg, oldVal);
     if (newVal === null || newVal.trim() === oldVal) return;
 
     s[field] = newVal.trim();
@@ -1572,6 +1587,7 @@ function showCommunityView(communityId) {
 
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-community').classList.add('active');
+    pushViewHistory();
 }
 
 // ===== FILES =====
@@ -1969,6 +1985,7 @@ function showContactView(contactId) {
 
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-contact-detail').classList.add('active');
+    pushViewHistory();
 }
 
 function openEditCurrentContact() {
@@ -2376,7 +2393,7 @@ function getTimelineTypeClass(type) {
         'Communication': 'type-comm',
         'Status Change': 'type-status',
         'Info Edit': 'type-edit',
-        'Field Work': 'type-audit',
+        'Site Work': 'type-audit',
         'Installation': 'type-audit',
         'Removal': 'type-movement',
         'Maintenance': 'type-audit',
@@ -2748,7 +2765,7 @@ function getSelectedStatuses(containerId) {
 }
 
 const FILTER_GROUPS = {
-    '_notes': ['General', 'Audit', 'Field Work', 'Issue', 'Installation', 'Removal', 'Maintenance'],
+    '_notes': ['General', 'Audit', 'Site Work', 'Issue', 'Installation', 'Removal', 'Maintenance'],
     '_changes': ['Info Edit', 'Status Change', 'Movement'],
 };
 
@@ -3085,6 +3102,119 @@ async function disableMfa(factorId) {
     const { error } = await supa.auth.mfa.unenroll({ factorId });
     if (error) { alert(error.message); return; }
     await renderMfaSettings();
+}
+
+// ===== BACK BUTTON =====
+let viewHistory = [];
+
+function pushViewHistory() {
+    const active = document.querySelector('.view.active');
+    if (active) viewHistory.push(active.id);
+    if (viewHistory.length > 20) viewHistory.shift();
+    updateBackButton();
+}
+
+function updateBackButton() {
+    const btn = document.getElementById('back-button');
+    btn.style.display = viewHistory.length > 1 ? '' : 'none';
+}
+
+function goBack() {
+    if (viewHistory.length <= 1) return;
+    viewHistory.pop();
+    const prevViewId = viewHistory[viewHistory.length - 1];
+    if (prevViewId === 'view-dashboard') showView('dashboard');
+    else if (prevViewId === 'view-all-sensors') showView('all-sensors');
+    else if (prevViewId === 'view-communities') showView('communities');
+    else if (prevViewId === 'view-contacts') showView('contacts');
+    else if (prevViewId === 'view-settings') showView('settings');
+    else if (prevViewId === 'view-community' && currentCommunity) showCommunityView(currentCommunity);
+    else if (prevViewId === 'view-sensor-detail' && currentSensor) showSensorView(currentSensor);
+    else if (prevViewId === 'view-contact-detail' && currentContact) showContactView(currentContact);
+    viewHistory.pop();
+    updateBackButton();
+}
+
+// ===== VIEW INSTALLATION HISTORY =====
+function viewInstallHistory() {
+    const filterEl = document.getElementById('sensor-history-filter');
+    if (filterEl) filterEl.value = '_changes';
+    filterSensorHistory();
+    document.getElementById('tab-sensor-history').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ===== PINNED SIDEBAR ITEMS =====
+let pinnedItems = loadData('pinnedItems', []);
+
+function renderPinnedSidebar() {
+    const section = document.getElementById('sidebar-pinned-section');
+    const list = document.getElementById('sidebar-pinned-list');
+    if (!pinnedItems.length) { section.style.display = 'none'; return; }
+    section.style.display = '';
+    list.innerHTML = pinnedItems.map(pin => {
+        let onclick = '';
+        let label = pin.label;
+        if (pin.type === 'community') onclick = `showCommunity('${pin.id}')`;
+        else if (pin.type === 'tag') onclick = `filterCommunitiesByTag('${pin.id.replace(/'/g, "\\'")}')`;
+        return `<li><a href="#" class="sidebar-pinned-item" onclick="event.preventDefault(); ${onclick}">
+            ${label}
+            <span class="sidebar-pin-remove" onclick="event.stopPropagation(); event.preventDefault(); unpinItem('${pin.type}', '${pin.id.replace(/'/g, "\\'")}')">&times;</span>
+        </a></li>`;
+    }).join('');
+}
+
+function pinCommunity(communityId) {
+    const c = COMMUNITIES.find(x => x.id === communityId);
+    if (!c || pinnedItems.find(p => p.type === 'community' && p.id === communityId)) return;
+    pinnedItems.push({ type: 'community', id: communityId, label: c.name });
+    saveData('pinnedItems', pinnedItems);
+    renderPinnedSidebar();
+}
+
+function pinTag(tag) {
+    if (pinnedItems.find(p => p.type === 'tag' && p.id === tag)) return;
+    pinnedItems.push({ type: 'tag', id: tag, label: tag });
+    saveData('pinnedItems', pinnedItems);
+    renderPinnedSidebar();
+}
+
+function unpinItem(type, id) {
+    pinnedItems = pinnedItems.filter(p => !(p.type === type && p.id === id));
+    saveData('pinnedItems', pinnedItems);
+    renderPinnedSidebar();
+}
+
+// ===== COMMUNITY DEACTIVATION =====
+let deactivatedCommunities = loadData('deactivatedCommunities', []);
+
+function deactivateCommunity(communityId) {
+    if (!confirm('Deactivate this community? It will move to the bottom of the list. All history is preserved.')) return;
+    if (!deactivatedCommunities.includes(communityId)) {
+        deactivatedCommunities.push(communityId);
+        saveData('deactivatedCommunities', deactivatedCommunities);
+    }
+    showView('communities');
+}
+
+function reactivateCommunity(communityId) {
+    deactivatedCommunities = deactivatedCommunities.filter(id => id !== communityId);
+    saveData('deactivatedCommunities', deactivatedCommunities);
+    showView('communities');
+}
+
+function isCommunityDeactivated(communityId) {
+    return deactivatedCommunities.includes(communityId);
+}
+
+// ===== ADD CUSTOM TAG IN NEW COMMUNITY MODAL =====
+function addNewCommunityCustomTag() {
+    const input = document.getElementById('new-community-custom-tag');
+    const tag = input.value.trim();
+    if (!tag) return;
+    if (!AVAILABLE_TAGS.includes(tag)) AVAILABLE_TAGS.push(tag);
+    if (!newCommunitySelectedTags.includes(tag)) newCommunitySelectedTags.push(tag);
+    input.value = '';
+    renderNewCommunityTags();
 }
 
 // ===== INIT =====

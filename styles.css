@@ -2362,6 +2362,97 @@ tr:last-child td {
     letter-spacing: 4px;
 }
 
+/* ===== BACK BUTTON ===== */
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--slate-400);
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: color 0.15s ease;
+}
+
+.back-button:hover {
+    color: var(--navy-600);
+}
+
+/* ===== PINNED SIDEBAR ===== */
+.sidebar-pinned-header {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--slate-600);
+    padding: 12px 14px 4px;
+}
+
+.sidebar-pinned-list {
+    list-style: none;
+}
+
+.sidebar-pinned-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px 6px 24px;
+    color: var(--slate-400);
+    text-decoration: none;
+    font-size: 12.5px;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    border-radius: var(--radius-sm);
+    margin: 0 8px;
+}
+
+.sidebar-pinned-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--slate-200);
+}
+
+.sidebar-pin-remove {
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    color: var(--slate-500);
+}
+
+.sidebar-pinned-item:hover .sidebar-pin-remove {
+    opacity: 1;
+}
+
+.sidebar-pin-remove:hover {
+    color: var(--aurora-rose);
+}
+
+/* ===== COMMUNITY DETAIL ACTIONS ===== */
+.community-detail-actions {
+    display: flex;
+    gap: 16px;
+}
+
+/* ===== DEACTIVATED COMMUNITIES ===== */
+.deactivated-section-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--slate-400);
+    padding: 20px 0 8px;
+    margin-top: 12px;
+    border-top: 1px solid var(--slate-200);
+}
+
+.community-row-deactivated {
+    opacity: 0.4;
+}
+
+.community-row-deactivated:hover {
+    opacity: 0.7;
+}
+
 /* ===== EMPTY STATES ===== */
 .empty-state {
     text-align: center;
