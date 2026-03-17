@@ -1341,7 +1341,7 @@ function showSensorView(sensorId) {
                 <input class="inline-edit-input" data-sensor="${s.id}" data-field="location" value="${s.location || ''}" placeholder="Address or GPS coordinates" onblur="inlineSaveSensor(this)" onkeydown="if(event.key==='Enter')this.blur()">
             </div>
             <div class="info-item"><label>Install Date</label>
-                <input class="inline-edit-input" type="date" data-sensor="${s.id}" data-field="dateInstalled" value="${s.dateInstalled || ''}" onblur="inlineSaveSensor(this)">
+                <p>${s.dateInstalled || '—'}</p>
             </div>
             <div class="info-item"><label>Purchase Date</label>
                 <input class="inline-edit-input" type="date" data-sensor="${s.id}" data-field="datePurchased" value="${s.datePurchased || ''}" onblur="inlineSaveSensor(this)">
@@ -1357,7 +1357,7 @@ function showSensorView(sensorId) {
             <div class="info-item"><label>Status</label><p>${renderStatusBadges(s, true)}</p></div>
             <div class="info-item"><label>Community</label><p>${getCommunityName(s.community)} <a class="move-sensor-link" onclick="openMoveSensorModal('${s.id}')">Move &rarr;</a></p></div>
             <div class="info-item"><label>Location</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'location')">${s.location || '<span class="field-placeholder">Address or GPS coordinates</span>'}</p></div>
-            <div class="info-item"><label>Install Date</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'dateInstalled')">${s.dateInstalled || '—'}</p> <a class="move-sensor-link" onclick="viewInstallHistory()">View history &rarr;</a></div>
+            <div class="info-item"><label>Install Date</label><p>${s.dateInstalled || '—'} <a class="move-sensor-link" onclick="viewInstallHistory()">View history &rarr;</a></p></div>
             <div class="info-item"><label>Purchase Date</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'datePurchased')">${s.datePurchased || '—'}</p></div>
             <div class="info-item"><label>Collocation Dates</label><p class="editable-field" onclick="inlineEditSensor('${s.id}', 'collocationDates')">${s.collocationDates || '—'}</p></div>
         `;
@@ -1380,7 +1380,7 @@ function inlineEditSensor(sensorId, field) {
     const s = sensors.find(x => x.id === sensorId);
     if (!s) return;
 
-    const labels = { soaTagId: 'SOA Tag ID', location: 'Location', datePurchased: 'Purchase Date', collocationDates: 'Collocation Dates', dateInstalled: 'Install Date' };
+    const labels = { soaTagId: 'SOA Tag ID', location: 'Location', datePurchased: 'Purchase Date', collocationDates: 'Collocation Dates' };
     const label = labels[field] || field;
     const oldVal = s[field] || '';
     const promptMsg = field === 'location' ? `Edit ${label} (enter an address or GPS coordinates):` : `Edit ${label}:`;
