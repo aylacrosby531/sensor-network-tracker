@@ -806,9 +806,11 @@ function getStatusBadgeClass(status) {
         'Lab Storage': 'badge-lab-storage',
         'Needs Repair': 'badge-needs-repair',
         'Ready for Deployment': 'badge-ready',
-        'PM Sensor Issue': 'badge-issue',
-        'Gaseous Sensor Issue': 'badge-issue',
-        'SD Card Issue': 'badge-issue',
+        'PM Sensor Issue': 'badge-issue-orange',
+        'Gaseous Sensor Issue': 'badge-issue-orange',
+        'SD Card Issue': 'badge-issue-yellow',
+        'Power Failure': 'badge-issue-red',
+        'Lost Connection': 'badge-issue-red',
     };
     return map[status] || 'badge-offline';
 }
@@ -851,6 +853,8 @@ function renderSensors() {
         if (sensorTagFilter) {
             if (sensorTagFilter === 'Sensor Issue') {
                 if (!getStatusArray(s).some(st => SENSOR_ISSUE_STATUSES.includes(st))) return false;
+            } else if (sensorTagFilter === 'Audit & Permanent Pods') {
+                if (s.type !== 'Audit Pod' && s.type !== 'Permanent Pod') return false;
             } else {
                 if (s.type !== sensorTagFilter) return false;
             }
@@ -1480,6 +1484,7 @@ function showCommunityView(communityId) {
     // Show/hide sub-community button (only for non-child communities)
     const addSubBtn = document.getElementById('add-sub-community-btn');
     if (addSubBtn) addSubBtn.style.display = isChildCommunity(communityId) ? 'none' : '';
+    updatePinButton(communityId);
 
     document.querySelectorAll('.community-list a').forEach(a => a.classList.remove('active'));
 
@@ -2754,7 +2759,7 @@ function addCustomTag() {
 const ALL_STATUSES = [
     'Online', 'Offline', 'In Transit', 'Service at Quant', 'Collocation',
     'Auditing a Community', 'Lab Storage', 'Needs Repair', 'Ready for Deployment',
-    'PM Sensor Issue', 'Gaseous Sensor Issue', 'SD Card Issue'
+    'PM Sensor Issue', 'Gaseous Sensor Issue', 'SD Card Issue', 'Power Failure', 'Lost Connection'
 ];
 
 function renderStatusToggleList(containerId, selectedStatuses) {
@@ -3118,18 +3123,17 @@ async function disableMfa(factorId) {
 }
 
 // ===== SENSOR TAGS & SIDEBAR =====
-const SENSOR_ISSUE_STATUSES = ['PM Sensor Issue', 'Gaseous Sensor Issue', 'SD Card Issue', 'Needs Repair'];
+const SENSOR_ISSUE_STATUSES = ['PM Sensor Issue', 'Gaseous Sensor Issue', 'SD Card Issue', 'Needs Repair', 'Power Failure', 'Lost Connection'];
 
 function getSensorTags() {
-    const tags = new Set();
-    sensors.forEach(s => {
-        const statuses = getStatusArray(s);
-        if (statuses.some(st => SENSOR_ISSUE_STATUSES.includes(st))) {
-            tags.add('Sensor Issue');
-        }
-    });
-    SENSOR_TYPES.forEach(t => tags.add(t));
-    return [...tags].sort();
+    const tags = [];
+    const hasIssue = sensors.some(s => getStatusArray(s).some(st => SENSOR_ISSUE_STATUSES.includes(st)));
+    if (hasIssue) tags.push('Sensor Issue');
+    tags.push('Community Pod');
+    tags.push('Audit & Permanent Pods');
+    tags.push('Collocation/Health Check');
+    tags.push('Not Assigned');
+    return tags;
 }
 
 let sensorTagFilter = '';
@@ -3242,57 +3246,32 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ===== EXPORT CSV =====
+// ===== EXPORT SPREADSHEET =====
+function exportSpreadsheet(headers, rows, filename) {
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+    ws['!cols'] = headers.map(() => ({ wch: 20 }));
+    XLSX.writeFile(wb, filename);
+}
+
 function exportSensorsCSV() {
     const headers = ['Sensor ID', 'SOA Tag ID', 'Type', 'Status', 'Community', 'Location', 'Install Date', 'Purchase Date', 'Collocation Dates'];
     const rows = sensors.sort((a, b) => a.id.localeCompare(b.id)).map(s => [
-        s.id,
-        s.soaTagId || '',
-        s.type,
-        getStatusArray(s).join('; '),
-        getCommunityName(s.community),
-        s.location || '',
-        s.dateInstalled || '',
-        s.datePurchased || '',
-        s.collocationDates || '',
+        s.id, s.soaTagId || '', s.type, getStatusArray(s).join('; '),
+        getCommunityName(s.community), s.location || '', s.dateInstalled || '',
+        s.datePurchased || '', s.collocationDates || '',
     ]);
-
-    const csv = [headers, ...rows].map(row =>
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    ).join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sensors_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportSpreadsheet(headers, rows, `sensors_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 function exportContactsCSV() {
     const headers = ['Name', 'Role', 'Community', 'Organization', 'Email', 'Phone', 'Status'];
     const rows = contacts.sort((a, b) => a.name.localeCompare(b.name)).map(c => [
-        c.name,
-        c.role || '',
-        getCommunityName(c.community),
-        c.org || '',
-        c.email || '',
-        c.phone || '',
-        c.active === false ? 'Inactive' : 'Active',
+        c.name, c.role || '', getCommunityName(c.community), c.org || '',
+        c.email || '', c.phone || '', c.active === false ? 'Inactive' : 'Active',
     ]);
-
-    const csv = [headers, ...rows].map(row =>
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    ).join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `contacts_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportSpreadsheet(headers, rows, `contacts_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 // ===== BULK ACTIONS =====
@@ -3333,70 +3312,66 @@ function openBulkActionModal() {
 }
 
 function toggleBulkFields() {
-    const action = document.getElementById('bulk-action-type').value;
-    document.getElementById('bulk-move-field').style.display = action === 'move' ? '' : 'none';
-    document.getElementById('bulk-status-field').style.display = action === 'status' ? '' : 'none';
+    const doMove = document.getElementById('bulk-do-move').checked;
+    const doStatus = document.getElementById('bulk-do-status').checked;
+    document.getElementById('bulk-move-community').style.display = doMove ? '' : 'none';
+    document.getElementById('bulk-status-list').style.display = doStatus ? '' : 'none';
 }
 
 function executeBulkAction() {
-    const action = document.getElementById('bulk-action-type').value;
+    const doMove = document.getElementById('bulk-do-move').checked;
+    const doStatus = document.getElementById('bulk-do-status').checked;
+    if (!doMove && !doStatus) { alert('Select at least one action.'); return; }
+
     const userNotes = document.getElementById('bulk-action-notes').value.trim();
     const sensorIds = Array.from(selectedSensors);
     const sensorList = sensorIds.join(', ');
     const now = nowDatetime();
 
-    if (action === 'move') {
-        const toCommunityId = document.getElementById('bulk-move-community').value;
-        if (!toCommunityId) { alert('Select a community.'); return; }
-        const toName = getCommunityName(toCommunityId);
+    let toCommunityId = null;
+    let toName = '';
+    let newStatuses = [];
 
-        sensorIds.forEach(id => {
-            const s = sensors.find(x => x.id === id);
-            if (!s) return;
+    if (doMove) {
+        toCommunityId = document.getElementById('bulk-move-community').value;
+        if (!toCommunityId) { alert('Select a community.'); return; }
+        toName = getCommunityName(toCommunityId);
+    }
+
+    if (doStatus) {
+        newStatuses = getSelectedStatuses('bulk-status-list');
+        if (newStatuses.length === 0) { alert('Select at least one status.'); return; }
+    }
+
+    sensorIds.forEach(id => {
+        const s = sensors.find(x => x.id === id);
+        if (!s) return;
+        if (doMove) {
             s.community = toCommunityId;
             s.dateInstalled = now.split('T')[0];
-            persistSensor(s);
-        });
-
-        if (!setupMode) {
-            const noteText = `Bulk move: ${sensorList} moved to ${toName}.${userNotes ? ' ' + userNotes : ''}`;
-            const note = {
-                id: 'n' + Date.now(),
-                date: now,
-                type: 'Movement',
-                text: noteText,
-                createdBy: getCurrentUserName(),
-                taggedSensors: sensorIds,
-                taggedCommunities: [toCommunityId],
-                taggedContacts: [],
-            };
-            notes.push(note); persistNote(note);
         }
-    } else if (action === 'status') {
-        const newStatuses = getSelectedStatuses('bulk-status-list');
-        if (newStatuses.length === 0) { alert('Select at least one status.'); return; }
-
-        sensorIds.forEach(id => {
-            const s = sensors.find(x => x.id === id);
-            if (!s) return;
+        if (doStatus) {
             s.status = newStatuses;
-            persistSensor(s);
-        });
-
-        if (!setupMode) {
-            const noteText = `Bulk status change: ${sensorList} set to ${newStatuses.join(', ')}.${userNotes ? ' ' + userNotes : ''}`;
-            const note = {
-                id: 'n' + Date.now(),
-                date: now,
-                type: 'Status Change',
-                text: noteText,
-                createdBy: getCurrentUserName(),
-                taggedSensors: sensorIds,
-                taggedCommunities: [],
-                taggedContacts: [],
-            };
-            notes.push(note); persistNote(note);
         }
+        persistSensor(s);
+    });
+
+    if (!setupMode) {
+        let parts = [];
+        if (doMove) parts.push(`moved to ${toName}`);
+        if (doStatus) parts.push(`status set to ${newStatuses.join(', ')}`);
+        const noteText = `Bulk action: ${sensorList} ${parts.join(' and ')}.${userNotes ? ' ' + userNotes : ''}`;
+        const note = {
+            id: 'n' + Date.now(),
+            date: now,
+            type: doMove ? 'Movement' : 'Status Change',
+            text: noteText,
+            createdBy: getCurrentUserName(),
+            taggedSensors: sensorIds,
+            taggedCommunities: toCommunityId ? [toCommunityId] : [],
+            taggedContacts: [],
+        };
+        notes.push(note); persistNote(note);
     }
 
     selectedSensors.clear();
@@ -3470,6 +3445,55 @@ function pinCommunity(communityId) {
     if (!c || pinnedItems.find(p => p.type === 'community' && p.id === communityId)) return;
     pinnedItems.push({ type: 'community', id: communityId, label: c.name });
     saveData('pinnedItems', pinnedItems);
+    renderPinnedSidebar();
+    updatePinButton(communityId);
+}
+
+function togglePinCommunity(communityId) {
+    const existing = pinnedItems.find(p => p.type === 'community' && p.id === communityId);
+    if (existing) {
+        unpinItem('community', communityId);
+    } else {
+        pinCommunity(communityId);
+    }
+    updatePinButton(communityId);
+}
+
+function updatePinButton(communityId) {
+    const isPinned = pinnedItems.find(p => p.type === 'community' && p.id === communityId);
+    const icon = document.getElementById('pin-icon');
+    const label = document.getElementById('pin-label');
+    if (icon) icon.textContent = isPinned ? '\u2605' : '\u2606';
+    if (label) label.textContent = isPinned ? 'Unpin' : 'Pin';
+}
+
+function editCommunityName() {
+    if (!currentCommunity) return;
+    const c = COMMUNITIES.find(x => x.id === currentCommunity);
+    if (!c) return;
+    const newName = prompt('Edit community name:', c.name);
+    if (!newName || newName.trim() === c.name) return;
+
+    const oldName = c.name;
+    c.name = newName.trim();
+    db.updateCommunity(currentCommunity, { name: c.name }).catch(err => console.error(err));
+
+    if (!setupMode) {
+        const note = {
+            id: 'n' + Date.now(),
+            date: nowDatetime(),
+            type: 'Info Edit',
+            text: `Community renamed from "${oldName}" to "${c.name}".`,
+            createdBy: getCurrentUserName(),
+            taggedSensors: [],
+            taggedCommunities: [currentCommunity],
+            taggedContacts: [],
+        };
+        notes.push(note); persistNote(note);
+    }
+
+    showCommunityView(currentCommunity);
+    buildSidebar();
     renderPinnedSidebar();
 }
 

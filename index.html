@@ -90,18 +90,16 @@
                         <span class="community-nav-label">Communities</span>
                         <span class="community-toggle-arrow" title="Show tag groups">&#9660;</span>
                     </a>
-                    <ul class="community-list" id="community-list">
-                        <!-- Populated by JS with tag groups -->
-                    </ul>
+                    <ul class="community-list" id="community-list"></ul>
+                    <div id="sidebar-pinned-section" style="display:none">
+                        <div class="sidebar-pinned-header">Pinned</div>
+                        <ul class="sidebar-pinned-list" id="sidebar-pinned-list"></ul>
+                    </div>
                 </li>
                 <li>
                     <a href="#" class="menu-item" data-view="contacts">
                         <span class="icon">&#9787;</span> Contacts
                     </a>
-                </li>
-                <li id="sidebar-pinned-section" style="display:none">
-                    <div class="sidebar-pinned-header">Pinned</div>
-                    <ul class="sidebar-pinned-list" id="sidebar-pinned-list"></ul>
                 </li>
             </ul>
             <div id="setup-mode-toggle" class="setup-mode-toggle" onclick="toggleSetupMode()">
@@ -134,7 +132,7 @@
                 <div class="view-header">
                     <h1>All Sensors</h1>
                     <button class="btn btn-primary" onclick="openAddSensorModal()">+ Add Sensor</button>
-                    <button class="btn" onclick="exportSensorsCSV()">Export CSV</button>
+                    <button class="btn" onclick="exportSensorsCSV()">Export Spreadsheet</button>
                     <button class="btn" id="bulk-action-btn" style="display:none" onclick="openBulkActionModal()">Bulk Action (<span id="bulk-count">0</span>)</button>
                 </div>
                 <div class="filter-bar">
@@ -191,16 +189,17 @@
 
             <!-- Single Community View -->
             <div id="view-community" class="view">
-                <div class="view-header" style="flex-direction:column;align-items:flex-start;gap:6px">
-                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-                        <h1 id="community-name"></h1>
+                <div class="community-detail-header">
+                    <div class="community-detail-top">
+                        <h1 id="community-name" class="community-name-editable"></h1>
+                        <span class="community-edit-name-btn" id="community-edit-name-btn" onclick="editCommunityName()" title="Edit name">&#9998;</span>
                         <div class="community-tags-container" id="community-type-badge"></div>
                     </div>
-                    <span class="community-detail-actions">
-                        <a class="add-sub-community-link" id="add-sub-community-btn" onclick="openAddSubCommunityModal(currentCommunity)">+ Sub-Community</a>
-                        <a class="add-sub-community-link" id="pin-community-btn" onclick="pinCommunity(currentCommunity)">&#9733; Pin</a>
-                        <a class="add-sub-community-link" style="color:var(--slate-400)" id="deactivate-community-btn" onclick="deactivateCommunity(currentCommunity)">Deactivate</a>
-                    </span>
+                    <div class="community-detail-toolbar">
+                        <button class="btn btn-sm" id="pin-community-btn" onclick="togglePinCommunity(currentCommunity)"><span id="pin-icon">&#9733;</span> <span id="pin-label">Pin</span></button>
+                        <button class="btn btn-sm" id="add-sub-community-btn" onclick="openAddSubCommunityModal(currentCommunity)">+ Sub-Community</button>
+                        <button class="btn btn-sm btn-danger" id="deactivate-community-btn" onclick="deactivateCommunity(currentCommunity)">Deactivate</button>
+                    </div>
                 </div>
 
                 <div class="tabs">
@@ -253,7 +252,7 @@
                     <h1>All Contacts</h1>
                     <button class="btn btn-primary" onclick="openAddContactModal()">+ Add Contact</button>
                     <button class="btn btn-primary" onclick="openEmailModal()">&#9993; Email</button>
-                    <button class="btn" onclick="exportContactsCSV()">Export CSV</button>
+                    <button class="btn" onclick="exportContactsCSV()">Export Spreadsheet</button>
                 </div>
                 <div class="filter-bar">
                     <input type="text" id="contact-search" placeholder="Search contacts..." oninput="renderContacts()">
@@ -774,19 +773,12 @@
                 <button class="modal-close" onclick="closeModal('modal-bulk-action')">&times;</button>
             </div>
             <div class="form-group" style="margin-top:16px">
-                <label>Action</label>
-                <select id="bulk-action-type" onchange="toggleBulkFields()">
-                    <option value="move">Move to Community</option>
-                    <option value="status">Change Status</option>
-                </select>
+                <label><input type="checkbox" id="bulk-do-move" onchange="toggleBulkFields()" checked> Move to Community</label>
+                <select id="bulk-move-community" style="margin-top:6px"></select>
             </div>
-            <div class="form-group" id="bulk-move-field">
-                <label>Move To Community</label>
-                <select id="bulk-move-community"></select>
-            </div>
-            <div class="form-group" id="bulk-status-field" style="display:none">
-                <label>Set Status</label>
-                <div id="bulk-status-list" class="status-toggle-list"></div>
+            <div class="form-group">
+                <label><input type="checkbox" id="bulk-do-status" onchange="toggleBulkFields()"> Change Status</label>
+                <div id="bulk-status-list" class="status-toggle-list" style="margin-top:6px;display:none"></div>
             </div>
             <div class="form-group" id="bulk-notes-field">
                 <label>Notes (optional — logged as a single group event)</label>
@@ -817,6 +809,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="supabase-client.js"></script>
     <script src="app.js"></script>
 </body>
