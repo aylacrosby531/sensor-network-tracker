@@ -29,6 +29,13 @@
     --navy-200: #b3d0f5;
     --navy-100: #dce9f8;
 
+    --accent-600: #475569;
+    --accent-500: #64748b;
+    --accent-400: #94a3b8;
+    --accent-300: #cbd5e1;
+    --accent-200: #e2e8f0;
+    --accent-100: #f1f5f9;
+
     --gold-600: #475569;
     --gold-500: #64748b;
     --gold-400: #94a3b8;
@@ -439,7 +446,7 @@ body {
 .inline-edit-input:focus {
     outline: none;
     border-color: var(--gold-400);
-    box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.15);
+    box-shadow: 0 0 0 2px rgba(71, 85, 105, 0.15);
 }
 
 .inline-edit-select {
@@ -459,7 +466,7 @@ body {
 .inline-edit-select:focus {
     outline: none;
     border-color: var(--gold-400);
-    box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.15);
+    box-shadow: 0 0 0 2px rgba(71, 85, 105, 0.15);
 }
 
 .inline-edit-sm {
@@ -1318,7 +1325,7 @@ tr:last-child td {
 .timeline-item.type-issue::before { background: var(--aurora-rose); box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.2); }
 .timeline-item.type-comm::before { background: var(--aurora-green); box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2); }
 .timeline-item.type-status::before { background: var(--aurora-violet); box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.2); }
-.timeline-item.type-edit::before { background: var(--gold-500); box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2); }
+.timeline-item.type-edit::before { background: var(--gold-500); box-shadow: 0 0 0 2px rgba(71, 85, 105, 0.2); }
 
 .timeline-header {
     display: flex;
