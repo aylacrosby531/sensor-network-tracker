@@ -153,15 +153,14 @@ const db = {
 
     // --- Notes ---
     async getNotes() {
-        const { data: notesData, error: notesError } = await supa.from('notes').select('*').order('date', { ascending: false });
-        if (notesError) throw notesError;
+        const { data, error } = await supa
+            .from('notes')
+            .select('*, note_tags(*)')
+            .order('date', { ascending: false });
+        if (error) throw error;
 
-        const { data: tagsData, error: tagsError } = await supa.from('note_tags').select('*');
-        if (tagsError) throw tagsError;
-
-        // Merge tags into notes
-        return (notesData || []).map(note => {
-            const tags = (tagsData || []).filter(t => t.note_id === note.id);
+        return (data || []).map(note => {
+            const tags = note.note_tags || [];
             return {
                 id: note.id,
                 date: note.date,
@@ -205,14 +204,14 @@ const db = {
 
     // --- Communications ---
     async getComms() {
-        const { data: commsData, error: commsError } = await supa.from('comms').select('*').order('date', { ascending: false });
-        if (commsError) throw commsError;
+        const { data, error } = await supa
+            .from('comms')
+            .select('*, comm_tags(*)')
+            .order('date', { ascending: false });
+        if (error) throw error;
 
-        const { data: tagsData, error: tagsError } = await supa.from('comm_tags').select('*');
-        if (tagsError) throw tagsError;
-
-        return (commsData || []).map(comm => {
-            const tags = (tagsData || []).filter(t => t.comm_id === comm.id);
+        return (data || []).map(comm => {
+            const tags = comm.comm_tags || [];
             return {
                 id: comm.id,
                 date: comm.date,

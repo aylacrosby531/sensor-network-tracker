@@ -95,30 +95,50 @@ async function loadAllData() {
     });
 }
 
-// persist() pushes all changed data to Supabase
-// Targeted persist functions for specific operations
-function persistSensor(sensorData) {
-    db.upsertSensor(sensorData).catch(err => console.error('Sensor save error:', err));
+// ===== PERSISTENCE LAYER =====
+// Fire-and-forget writes to Supabase. UI updates immediately from in-memory arrays.
+function persistSensor(s) { db.upsertSensor(s).catch(err => console.error('Save error:', err)); }
+function persistContact(c) { return db.upsertContact(c).catch(err => console.error('Save error:', err)); }
+function persistNote(n) { return db.insertNote(n).catch(err => console.error('Save error:', err)); }
+function persistComm(c) { return db.insertComm(c).catch(err => console.error('Save error:', err)); }
+function persistCommunityTags(id, tags) { db.setCommunityTags(id, tags).catch(err => console.error('Save error:', err)); }
+function persistCommunity(c) { db.insertCommunity(c).catch(err => console.error('Save error:', err)); }
+
+// ===== UTILITIES =====
+function generateId(prefix) {
+    return prefix + Date.now() + Math.random().toString(36).slice(2, 6);
 }
 
-function persistContact(contactData) {
-    return db.upsertContact(contactData).catch(err => console.error('Contact save error:', err));
+function createNote(type, text, tags, additionalInfo) {
+    const note = {
+        id: generateId('n'),
+        date: nowDatetime(),
+        type,
+        text,
+        additionalInfo: additionalInfo || '',
+        createdBy: getCurrentUserName(),
+        createdAt: new Date().toISOString(),
+        taggedSensors: tags?.sensors || [],
+        taggedCommunities: tags?.communities || [],
+        taggedContacts: tags?.contacts || [],
+    };
+    notes.push(note);
+    persistNote(note);
+    return note;
 }
 
-function persistNote(noteData) {
-    return db.insertNote(noteData).catch(err => console.error('Note save error:', err));
+function createNoteIfNotSetup(type, text, tags, additionalInfo) {
+    if (!setupMode) return createNote(type, text, tags, additionalInfo);
+    return null;
 }
 
-function persistComm(commData) {
-    return db.insertComm(commData).catch(err => console.error('Comm save error:', err));
-}
-
-function persistCommunityTags(communityId, tags) {
-    db.setCommunityTags(communityId, tags).catch(err => console.error('Tag save error:', err));
-}
-
-function persistCommunity(community) {
-    db.insertCommunity(community).catch(err => console.error('Community save error:', err));
+function hideAllAuthForms() {
+    document.getElementById('login-form-section').style.display = 'none';
+    document.getElementById('signup-form-section').style.display = 'none';
+    document.getElementById('mfa-challenge-section').style.display = 'none';
+    document.getElementById('mfa-setup-section').style.display = 'none';
+    document.getElementById('login-loading').style.display = 'none';
+    hideLoginError();
 }
 
 function getCommunityTags(communityId) {
@@ -162,40 +182,28 @@ let currentUserId = null;
 function showLoginScreen() {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
-    document.getElementById('login-loading').style.display = 'none';
+    hideAllAuthForms();
     document.getElementById('login-form-section').style.display = '';
-    document.getElementById('signup-form-section').style.display = 'none';
-    document.getElementById('mfa-challenge-section').style.display = 'none';
-    document.getElementById('mfa-setup-section').style.display = 'none';
-    hideLoginError();
 }
 
 function showSignUpForm() {
-    document.getElementById('login-form-section').style.display = 'none';
+    hideAllAuthForms();
     document.getElementById('signup-form-section').style.display = '';
-    hideLoginError();
 }
 
 async function backToSignIn() {
     await supa.auth.signOut();
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
+    hideAllAuthForms();
     document.getElementById('login-form-section').style.display = '';
-    document.getElementById('signup-form-section').style.display = 'none';
-    document.getElementById('mfa-challenge-section').style.display = 'none';
-    document.getElementById('mfa-setup-section').style.display = 'none';
-    document.getElementById('login-loading').style.display = 'none';
     document.getElementById('login-email').value = '';
     document.getElementById('login-password').value = '';
-    hideLoginError();
 }
 
 function showSignInForm() {
+    hideAllAuthForms();
     document.getElementById('login-form-section').style.display = '';
-    document.getElementById('signup-form-section').style.display = 'none';
-    document.getElementById('mfa-challenge-section').style.display = 'none';
-    document.getElementById('mfa-setup-section').style.display = 'none';
-    hideLoginError();
 }
 
 function showLoginError(msg) {
@@ -239,18 +247,14 @@ async function checkMfaAndProceed() {
 }
 
 function showMfaChallenge() {
-    document.getElementById('login-form-section').style.display = 'none';
-    document.getElementById('signup-form-section').style.display = 'none';
-    document.getElementById('mfa-setup-section').style.display = 'none';
+    hideAllAuthForms();
     document.getElementById('mfa-challenge-section').style.display = '';
     document.getElementById('mfa-challenge-code').value = '';
     document.getElementById('mfa-challenge-code').focus();
 }
 
 function showMfaSetup() {
-    document.getElementById('login-form-section').style.display = 'none';
-    document.getElementById('signup-form-section').style.display = 'none';
-    document.getElementById('mfa-challenge-section').style.display = 'none';
+    hideAllAuthForms();
     document.getElementById('mfa-setup-section').style.display = '';
     startMfaEnrollment();
 }
@@ -998,7 +1002,7 @@ function inlineSaveContact(el) {
     if (!setupMode && (field === 'email' || field === 'phone') && oldVal !== newVal) {
         const label = field === 'email' ? 'Email' : 'Phone';
         const note = {
-            id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+            id: generateId('n'),
             date: nowDatetime(),
             type: 'Info Edit',
             text: `${c.name} ${label.toLowerCase()} changed from "${oldVal || '(empty)'}" to "${newVal || '(empty)'}".`,
@@ -1157,7 +1161,7 @@ function buildAnnotationNote(annotation, additionalInfo, date) {
     }
 
     return {
-        id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+        id: generateId('n'),
         date: date || nowDatetime(),
         type: noteType,
         text: noteText,
@@ -1170,25 +1174,21 @@ function buildAnnotationNote(annotation, additionalInfo, date) {
 }
 
 function saveEditAnnotation() {
-    const annotation = pendingAnnotations.shift();
     const additionalInfo = document.getElementById('edit-annotation-text').value.trim();
-    const date = document.getElementById('edit-annotation-date').value || nowDatetime();
-
-    const _annNote1 = buildAnnotationNote(annotation, additionalInfo, date);
-    notes.push(_annNote1); persistNote(_annNote1);
-    closeModal('modal-edit-annotation');
-
-    setTimeout(() => showNextAnnotation(), 150);
+    completeAnnotation(additionalInfo);
 }
 
 function skipEditAnnotation() {
+    completeAnnotation('');
+}
+
+function completeAnnotation(additionalInfo) {
     const annotation = pendingAnnotations.shift();
     const date = document.getElementById('edit-annotation-date').value || nowDatetime();
-
-    const _annNote2 = buildAnnotationNote(annotation, '', date);
-    notes.push(_annNote2); persistNote(_annNote2);
+    const note = buildAnnotationNote(annotation, additionalInfo, date);
+    notes.push(note);
+    persistNote(note);
     closeModal('modal-edit-annotation');
-
     setTimeout(() => showNextAnnotation(), 150);
 }
 
@@ -1234,7 +1234,7 @@ function saveStatusChange(e) {
     const mentionedContacts = parseMentionedContacts(additionalInfo);
 
     const note = {
-        id: 'n' + Date.now(),
+        id: generateId('n'),
         date: statusDate,
         type: 'Status Change',
         text: noteText,
@@ -1292,7 +1292,7 @@ function moveSensor(e) {
     const taggedCommunities = [fromId, toCommunityId].filter(Boolean);
 
     const note = {
-        id: 'n' + Date.now(),
+        id: generateId('n'),
         date: moveDate,
         type: 'Movement',
         text: noteText,
@@ -1827,7 +1827,7 @@ function saveContact(e) {
     }
 
     const data = {
-        id: editId || 'c' + Date.now(),
+        id: editId || generateId('c'),
         name: document.getElementById('contact-name-input').value.trim(),
         role: document.getElementById('contact-role-input').value.trim(),
         community: document.getElementById('contact-community-input').value,
@@ -1862,7 +1862,7 @@ function saveContact(e) {
         // Log new contact added
         if (!setupMode && data.community) {
             const note = {
-                id: 'n' + Date.now() + 'nc',
+                id: generateId('n'),
                 date: nowDatetime(),
                 type: 'Info Edit',
                 text: `${data.name} added as a contact for ${getCommunityName(data.community)}.`,
@@ -1882,13 +1882,13 @@ function saveContact(e) {
     // Auto-log email/phone changes (not in setup mode)
     if (!setupMode && editId) {
         if (emailChanged) {
-            const note = { id: 'n' + Date.now() + 'e', date: nowDatetime(), type: 'Info Edit',
+            const note = { id: generateId('n'), date: nowDatetime(), type: 'Info Edit',
                 text: `${data.name} email changed from "${oldEmail || '(empty)'}" to "${data.email || '(empty)'}".`,
                 createdBy: getCurrentUserName(), taggedSensors: [], taggedCommunities: data.community ? [data.community] : [], taggedContacts: [data.id] };
             notes.push(note); persistNote(note);
         }
         if (phoneChanged) {
-            const note = { id: 'n' + Date.now() + 'p', date: nowDatetime(), type: 'Info Edit',
+            const note = { id: generateId('n'), date: nowDatetime(), type: 'Info Edit',
                 text: `${data.name} phone changed from "${oldPhone || '(empty)'}" to "${data.phone || '(empty)'}".`,
                 createdBy: getCurrentUserName(), taggedSensors: [], taggedCommunities: data.community ? [data.community] : [], taggedContacts: [data.id] };
             notes.push(note); persistNote(note);
@@ -1935,7 +1935,7 @@ function saveContactStatusNote() {
         : `${p.contactName} reactivated.`;
 
     const note = {
-        id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+        id: generateId('n'),
         date: date,
         type: 'Info Edit',
         text: noteText,
@@ -1964,7 +1964,7 @@ function skipContactStatusNote() {
         : `${p.contactName} reactivated.`;
 
     const note = {
-        id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+        id: generateId('n'),
         date: date,
         type: 'Info Edit',
         text: noteText,
@@ -2331,7 +2331,7 @@ function saveNote(e) {
     });
 
     const note = {
-        id: 'n' + Date.now(),
+        id: generateId('n'),
         date: noteDate,
         type: type,
         text: text,
@@ -2357,7 +2357,7 @@ function saveNote(e) {
 
             if (!setupMode) {
                 const statusNote = {
-                    id: 'n' + Date.now() + 'st',
+                    id: generateId('n'),
                     date: noteDate,
                     type: 'Status Change',
                     text: `${s.id} status changed from "${oldStatuses.join(', ') || '(none)'}" to "${newStatuses.join(', ')}".`,
@@ -2759,7 +2759,7 @@ function saveCommunity(e) {
     // Log sub-community creation
     if (!setupMode && parentId) {
         const note = {
-            id: 'n' + Date.now() + 'sc',
+            id: generateId('n'),
             date: nowDatetime(),
             type: 'Info Edit',
             text: `Sub-community "${name}" added under ${getCommunityName(parentId)}.`,
@@ -2810,7 +2810,7 @@ function toggleCommunityTag(tag) {
         communityTags[editingTagsCommunity] = current.filter(t => t !== tag);
 
         const note = {
-            id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+            id: generateId('n'),
             date: nowDatetime(),
             type: 'Info Edit',
             text: `Tag "${tag}" removed from ${community.name}.`,
@@ -2826,7 +2826,7 @@ function toggleCommunityTag(tag) {
         communityTags[editingTagsCommunity].push(tag);
 
         const note = {
-            id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+            id: generateId('n'),
             date: nowDatetime(),
             type: 'Info Edit',
             text: `Tag "${tag}" added to ${community.name}.`,
@@ -2861,7 +2861,7 @@ function addCustomTag() {
 
         const community = COMMUNITIES.find(c => c.id === editingTagsCommunity);
         const note = {
-            id: 'n' + Date.now() + Math.random().toString(36).slice(2, 5),
+            id: generateId('n'),
             date: nowDatetime(),
             type: 'Info Edit',
             text: `Tag "${tag}" added to ${community.name}.`,
@@ -3495,7 +3495,7 @@ function executeBulkAction() {
         if (doStatus) parts.push(`status set to ${newStatuses.join(', ')}`);
         const noteText = `Bulk action: ${sensorList} ${parts.join(' and ')}.${userNotes ? ' ' + userNotes : ''}`;
         const note = {
-            id: 'n' + Date.now(),
+            id: generateId('n'),
             date: now,
             type: doMove ? 'Movement' : 'Status Change',
             text: noteText,
@@ -3613,7 +3613,7 @@ function editCommunityName() {
 
     if (!setupMode) {
         const note = {
-            id: 'n' + Date.now(),
+            id: generateId('n'),
             date: nowDatetime(),
             type: 'Info Edit',
             text: `Community renamed from "${oldName}" to "${c.name}".`,

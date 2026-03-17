@@ -29,13 +29,6 @@
     --navy-200: #b3d0f5;
     --navy-100: #dce9f8;
 
-    --accent-600: #475569;
-    --accent-500: #64748b;
-    --accent-400: #94a3b8;
-    --accent-300: #cbd5e1;
-    --accent-200: #e2e8f0;
-    --accent-100: #f1f5f9;
-
     --gold-600: #475569;
     --gold-500: #64748b;
     --gold-400: #94a3b8;
@@ -48,11 +41,8 @@
     --aurora-rose: #f43f5e;
     --aurora-amber: #f59e0b;
     --aurora-violet: #a78bfa;
-    --aurora-cyan: #22d3ee;
 
     --surface: #ffffff;
-    --surface-warm: #fefffe;
-    --surface-elevated: rgba(255, 255, 255, 0.82);
 
     --radius-sm: 6px;
     --radius-md: 10px;
