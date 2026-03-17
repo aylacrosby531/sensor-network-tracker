@@ -2793,11 +2793,7 @@ function closeModal(id) {
     document.getElementById(id).classList.remove('open');
 }
 
-document.querySelectorAll('.modal').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.classList.remove('open');
-    });
-});
+// Modals only close via X, Cancel, or Save buttons — not by clicking outside
 
 // ===== HELPERS =====
 function populateCommunitySelect(selectId) {
