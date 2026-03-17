@@ -1597,6 +1597,20 @@ tr:last-child td {
     background: rgba(37, 99, 176, 0.06);
 }
 
+.hover-edit-icon-always {
+    opacity: 0.4;
+}
+
+.hover-edit-field:hover .hover-edit-icon-always {
+    opacity: 1;
+}
+
+.field-placeholder {
+    color: var(--slate-300);
+    font-style: italic;
+    font-weight: 400;
+}
+
 .editable-field {
     cursor: pointer;
     border-bottom: 1px dashed var(--slate-300);
