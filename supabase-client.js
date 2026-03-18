@@ -58,6 +58,16 @@ const db = {
         return data;
     },
 
+    async getAppSetting(key) {
+        const { data } = await supa.from('app_settings').select('value').eq('key', key).single();
+        return data?.value || null;
+    },
+
+    async setAppSetting(key, value) {
+        const { error } = await supa.from('app_settings').upsert({ key, value, updated_at: new Date().toISOString() });
+        if (error) throw error;
+    },
+
     // --- Communities ---
     async getCommunities() {
         const { data, error } = await supa.from('communities').select('*').order('name');

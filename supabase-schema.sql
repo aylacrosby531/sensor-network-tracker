@@ -7,14 +7,30 @@
 CREATE TABLE allowed_emails (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     email text UNIQUE NOT NULL,
+    role text DEFAULT 'user',
+    status text DEFAULT 'active',
     added_at timestamptz DEFAULT now()
 );
+
+-- ===== APP SETTINGS =====
+CREATE TABLE app_settings (
+    key text PRIMARY KEY,
+    value text NOT NULL,
+    updated_at timestamptz DEFAULT now()
+);
+
+INSERT INTO app_settings (key, value) VALUES ('mfa_required', 'true');
+
+-- Default admin user
+INSERT INTO allowed_emails (email, role, status) VALUES ('ayla.crosby@alaska.gov', 'admin', 'active')
+    ON CONFLICT (email) DO UPDATE SET role = 'admin';
 
 -- ===== USER PROFILES =====
 CREATE TABLE profiles (
     id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email text,
     name text,
+    role text DEFAULT 'user',
     created_at timestamptz DEFAULT now()
 );
 
@@ -155,10 +171,25 @@ ALTER TABLE comms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comm_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE community_files ENABLE ROW LEVEL SECURITY;
 
--- Policies: authenticated users can do everything
--- allowed_emails: only readable (admins manage via Supabase dashboard)
+ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+
+-- Policies
+-- app_settings: all authenticated can read, only admins can update
+CREATE POLICY "Authenticated users can read app_settings"
+    ON app_settings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins can update app_settings"
+    ON app_settings FOR UPDATE TO authenticated
+    USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- allowed_emails: all authenticated can read, admins can insert/update
 CREATE POLICY "Authenticated users can read allowed_emails"
     ON allowed_emails FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins can insert allowed_emails"
+    ON allowed_emails FOR INSERT TO authenticated
+    WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "Admins can update allowed_emails"
+    ON allowed_emails FOR UPDATE TO authenticated
+    USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- profiles
 CREATE POLICY "Authenticated users can read profiles"

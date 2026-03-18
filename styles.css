@@ -2828,6 +2828,16 @@ tr:last-child td {
     box-shadow: 0 0 0 3px rgba(37, 99, 176, 0.1);
 }
 
+.settings-add-user select {
+    padding: 9px 10px;
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    background: var(--surface);
+    color: var(--slate-600);
+}
+
 .mfa-setup-container {
     text-align: center;
     padding: 16px 0;

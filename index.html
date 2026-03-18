@@ -373,12 +373,13 @@
                     <div class="settings-card" id="settings-profile"></div>
                 </div>
 
-                <div class="settings-section">
-                    <h3 class="settings-section-title">Active Users</h3>
-                    <p class="settings-description">These email addresses can create accounts and access the app.</p>
+                <div class="settings-section" id="settings-users-section">
+                    <h3 class="settings-section-title">User Management</h3>
+                    <p class="settings-description">Approved email addresses and their roles. Only admins can manage users.</p>
                     <div id="settings-active-users"></div>
-                    <div class="settings-add-user">
+                    <div id="settings-add-user-row" class="settings-add-user" style="display:none">
                         <input type="email" id="settings-add-email" placeholder="Email address" aria-label="Email address to add">
+                        <select id="settings-add-role" aria-label="Role"><option value="user">User</option><option value="admin">Admin</option></select>
                         <button class="btn btn-primary" onclick="addAllowedEmail()">Add Email</button>
                     </div>
                 </div>
@@ -392,6 +393,12 @@
                 <div class="settings-section">
                     <h3 class="settings-section-title">Multi-Factor Authentication</h3>
                     <div id="settings-mfa"></div>
+                </div>
+
+                <div class="settings-section" id="settings-mfa-admin-section" style="display:none">
+                    <h3 class="settings-section-title">MFA Enforcement (Admin)</h3>
+                    <p class="settings-description">When enabled, all users must set up an authenticator app to access the platform.</p>
+                    <div id="settings-mfa-toggle"></div>
                 </div>
             </div>
         </main>

@@ -12,6 +12,8 @@ let communityTags = {};
 let serviceTickets = [];
 let audits = [];
 let communityParents = {}; // childId -> parentId
+let currentUserRole = 'user'; // 'admin' or 'user' — loaded from profile on login
+let mfaRequired = true; // global setting, admin-configurable
 
 function loadData(key, fallback) {
     try {
@@ -273,6 +275,16 @@ async function handleSignIn() {
 }
 
 async function checkMfaAndProceed() {
+    // Check if MFA is required globally
+    let mfaOn = true;
+    try { const setting = await db.getAppSetting('mfa_required'); mfaOn = setting !== 'false'; } catch(e) { mfaOn = true; }
+
+    if (!mfaOn) {
+        // MFA disabled — go straight to app
+        await enterApp();
+        return;
+    }
+
     const { data: factors } = await supa.auth.mfa.listFactors();
     const totp = factors?.totp?.find(f => f.status === 'verified');
 
@@ -371,6 +383,10 @@ async function enterApp() {
     const profile = await db.getProfile();
     currentUser = profile?.name || profile?.email || 'User';
     currentUserId = profile?.id || null;
+    currentUserRole = profile?.role || 'user';
+
+    // Load global MFA setting
+    try { const mfaSetting = await db.getAppSetting('mfa_required'); mfaRequired = mfaSetting !== 'false'; } catch(e) { mfaRequired = true; }
 
     await loadAllData();
 
@@ -440,6 +456,7 @@ function getCurrentUserName() {
 let setupMode = sessionStorage.getItem('snt_setupMode') === 'true';
 
 function toggleSetupMode() {
+    if (currentUserRole !== 'admin') return;
     setupMode = !setupMode;
     sessionStorage.setItem('snt_setupMode', setupMode);
     renderSetupModeIndicator();
@@ -456,6 +473,8 @@ function toggleSetupMode() {
 function renderSetupModeIndicator() {
     const el = document.getElementById('setup-mode-toggle');
     if (el) {
+        // Only admins can see setup mode
+        el.style.display = currentUserRole === 'admin' ? '' : 'none';
         el.classList.toggle('active', setupMode);
         el.querySelector('.setup-mode-label').textContent = setupMode ? 'Setup Mode ON' : 'Setup Mode';
     }
@@ -3365,47 +3384,82 @@ async function renderSettings() {
 }
 
 async function renderAllowedUsers(currentEmail) {
+    const isAdmin = currentUserRole === 'admin';
     const { data, error } = await supa.from('allowed_emails').select('*').order('email');
     if (error) { console.error(error); return; }
+
+    // Show/hide admin-only controls
+    document.getElementById('settings-add-user-row').style.display = isAdmin ? '' : 'none';
 
     const active = (data || []).filter(r => r.status !== 'revoked');
     const revoked = (data || []).filter(r => r.status === 'revoked');
 
     document.getElementById('settings-active-users').innerHTML = active.map(row => {
         const isYou = row.email.toLowerCase() === currentEmail.toLowerCase();
+        const roleBadge = row.role === 'admin'
+            ? '<span style="background:var(--navy-800);color:white;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:600;margin-left:6px">Admin</span>'
+            : '<span style="background:var(--slate-100);color:var(--slate-500);padding:1px 8px;border-radius:8px;font-size:10px;font-weight:600;margin-left:6px">User</span>';
+        const roleToggle = isAdmin && !isYou
+            ? `<select class="btn btn-sm" onchange="changeUserRole('${row.id}', this.value)" style="font-size:11px;padding:2px 6px">
+                <option value="user" ${row.role !== 'admin' ? 'selected' : ''}>User</option>
+                <option value="admin" ${row.role === 'admin' ? 'selected' : ''}>Admin</option>
+               </select>`
+            : '';
+        const revokeBtn = isAdmin && !isYou
+            ? `<button class="btn btn-sm btn-danger" onclick="revokeUser('${row.id}')">Revoke</button>`
+            : '';
         return `<div class="settings-user-row">
             <span>
-                <span class="settings-user-email">${row.email}</span>
+                <span class="settings-user-email">${escapeHtml(row.email)}</span>
+                ${roleBadge}
                 ${isYou ? '<span class="settings-user-you">(you)</span>' : ''}
             </span>
-            ${!isYou ? `<button class="btn btn-sm btn-danger" onclick="revokeUser('${row.id}')">Revoke Access</button>` : ''}
+            <span style="display:flex;gap:6px;align-items:center">${roleToggle}${revokeBtn}</span>
         </div>`;
     }).join('') || '<p style="color:var(--slate-400);font-size:13px">No active users.</p>';
 
     const revokedSection = document.getElementById('settings-revoked-section');
-    if (revoked.length > 0) {
+    if (revoked.length > 0 && isAdmin) {
         revokedSection.style.display = '';
         document.getElementById('settings-revoked-users').innerHTML = revoked.map(row => {
             return `<div class="settings-user-row">
-                <span class="settings-user-email" style="color:var(--slate-400)">${row.email}</span>
+                <span class="settings-user-email" style="color:var(--slate-400)">${escapeHtml(row.email)}</span>
                 <button class="btn btn-sm" onclick="reactivateUser('${row.id}')">Reactivate</button>
             </div>`;
         }).join('');
     } else {
         revokedSection.style.display = 'none';
     }
+
+    // MFA admin toggle
+    const mfaAdminSection = document.getElementById('settings-mfa-admin-section');
+    if (mfaAdminSection) {
+        mfaAdminSection.style.display = isAdmin ? '' : 'none';
+        if (isAdmin) {
+            document.getElementById('settings-mfa-toggle').innerHTML = `
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+                    <input type="checkbox" ${mfaRequired ? 'checked' : ''} onchange="toggleMfaRequirement(this.checked)" style="width:18px;height:18px">
+                    <span>Require MFA for all users</span>
+                </label>
+                <p style="font-size:12px;color:var(--slate-400);margin-top:6px">${mfaRequired ? 'MFA is currently required. All users must set up an authenticator app.' : 'MFA is currently disabled. Users can sign in with just email and password.'}</p>
+            `;
+        }
+    }
 }
 
 async function addAllowedEmail() {
+    if (currentUserRole !== 'admin') { alert('Only admins can add users.'); return; }
     const input = document.getElementById('settings-add-email');
+    const roleSelect = document.getElementById('settings-add-role');
     const email = input.value.trim().toLowerCase();
+    const role = roleSelect?.value || 'user';
     if (!email) return;
 
     const { data: existing } = await supa.from('allowed_emails').select('*').eq('email', email).single();
     if (existing && existing.status === 'revoked') {
-        await supa.from('allowed_emails').update({ status: 'active' }).eq('id', existing.id);
+        await supa.from('allowed_emails').update({ status: 'active', role }).eq('id', existing.id);
     } else {
-        const { error } = await supa.from('allowed_emails').insert({ email, status: 'active' });
+        const { error } = await supa.from('allowed_emails').insert({ email, status: 'active', role });
         if (error) {
             alert(error.message.includes('duplicate') ? 'That email is already added.' : error.message);
             return;
@@ -3413,11 +3467,13 @@ async function addAllowedEmail() {
     }
 
     input.value = '';
+    if (roleSelect) roleSelect.value = 'user';
     const session = await db.getSession();
     await renderAllowedUsers(session?.user?.email || '');
 }
 
 async function revokeUser(id) {
+    if (currentUserRole !== 'admin') { alert('Only admins can revoke access.'); return; }
     if (!confirm('Revoke access for this user? They will no longer be able to sign in. Their history will be preserved.')) return;
 
     const { error } = await supa.from('allowed_emails').update({ status: 'revoked' }).eq('id', id);
@@ -3428,11 +3484,39 @@ async function revokeUser(id) {
 }
 
 async function reactivateUser(id) {
+    if (currentUserRole !== 'admin') { alert('Only admins can reactivate users.'); return; }
     const { error } = await supa.from('allowed_emails').update({ status: 'active' }).eq('id', id);
     if (error) { alert(error.message); return; }
 
     const session = await db.getSession();
     await renderAllowedUsers(session?.user?.email || '');
+}
+
+async function changeUserRole(id, newRole) {
+    if (currentUserRole !== 'admin') { alert('Only admins can change roles.'); return; }
+    const { error } = await supa.from('allowed_emails').update({ role: newRole }).eq('id', id);
+    if (error) { alert(error.message); return; }
+
+    // Also update the profile if the user has one
+    const { data: emailRow } = await supa.from('allowed_emails').select('email').eq('id', id).single();
+    if (emailRow) {
+        await supa.from('profiles').update({ role: newRole }).eq('email', emailRow.email);
+    }
+
+    const session = await db.getSession();
+    await renderAllowedUsers(session?.user?.email || '');
+}
+
+async function toggleMfaRequirement(enabled) {
+    if (currentUserRole !== 'admin') { alert('Only admins can change MFA settings.'); return; }
+    try {
+        await db.setAppSetting('mfa_required', enabled ? 'true' : 'false');
+        mfaRequired = enabled;
+        const session = await db.getSession();
+        await renderAllowedUsers(session?.user?.email || '');
+    } catch (err) {
+        alert('Failed to update MFA setting: ' + err.message);
+    }
 }
 
 // ===== MFA =====
