@@ -115,11 +115,6 @@ const db = {
         if (error) throw error;
     },
 
-    async deleteSensor(id) {
-        const { error } = await supa.from('sensors').delete().eq('id', id);
-        if (error) throw error;
-    },
-
     // --- Contacts ---
     async getContacts() {
         const { data, error } = await supa.from('contacts').select('*').order('name');

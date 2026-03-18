@@ -967,7 +967,7 @@ function hideOrDeleteColumn(key) {
         sensors.forEach(s => { if (s.customFields) delete s.customFields[cfKey]; });
         saveCustomFieldData();
     } else {
-        const col = DEFAULT_SENSOR_COLUMNS.find(c => c.key === key);
+        const col = ALL_SENSOR_COLUMNS.find(c => c.key === key);
         if (!confirm(`Hide "${col?.label || key}" column? You can restore it later in setup mode.`)) return;
         hiddenColumns.push(key);
         saveData('hiddenSensorColumns', hiddenColumns);
@@ -978,7 +978,7 @@ function hideOrDeleteColumn(key) {
 }
 
 function restoreHiddenColumns() {
-    const names = hiddenColumns.map(key => DEFAULT_SENSOR_COLUMNS.find(c => c.key === key)?.label || key).join(', ');
+    const names = hiddenColumns.map(key => ALL_SENSOR_COLUMNS.find(c => c.key === key)?.label || key).join(', ');
     if (!confirm(`Restore hidden columns: ${names}?`)) return;
     hiddenColumns = [];
     saveData('hiddenSensorColumns', hiddenColumns);
