@@ -4481,6 +4481,12 @@ function openAuditDetail(auditId) {
 
     document.getElementById('audit-detail-modal-title').textContent = `Audit: ${communityName}`;
     document.getElementById('audit-detail-modal-body').innerHTML = `
+        <div style="padding:12px 28px 0"><div class="ticket-steps ticket-steps-detail">${progress}</div></div>
+        <div class="ticket-detail-actions" style="border-top:none;padding-top:8px">
+            <button class="btn" onclick="closeModal('modal-audit-detail')">Done</button>
+            ${nextStatus ? `<button class="btn btn-primary" onclick="advanceAuditStatus('${audit.id}')">Advance to: ${nextStatus}</button>` : ''}
+            ${audit.status === 'Complete' || audit.status === 'Analysis Pending' ? `<button class="btn" onclick="beginAnalysis('${audit.id}')" style="border-color:var(--navy-500);color:var(--navy-500)">Begin Analysis</button>` : ''}
+        </div>
         <div class="ticket-detail-grid">
             <div class="ticket-field"><label>Community</label><p><a href="#" onclick="closeModal('modal-audit-detail'); showCommunity('${audit.communityId}'); return false;" style="color:var(--navy-500)">${escapeHtml(communityName)}</a></p></div>
             <div class="ticket-field"><label>Status</label><p><span class="audit-status-badge ${AUDIT_STATUS_CSS[audit.status]}">${audit.status}</span></p></div>
@@ -4497,12 +4503,6 @@ function openAuditDetail(auditId) {
         <div style="padding:0 28px 16px"><label style="font-size:11px;font-weight:600;color:var(--slate-400);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Analysis Results</label>${analysisHtml}</div>
         <div style="padding:0 28px 16px"><label style="font-size:11px;font-weight:600;color:var(--slate-400);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Photos</label>
             ${isEditable ? `<label class="btn btn-sm" style="cursor:pointer;margin-bottom:8px">Upload Photos <input type="file" accept="image/*" multiple style="display:none" onchange="uploadAuditPhotos('${audit.id}', '${audit.communityId}', this.files)"></label>` : ''}
-        </div>
-        <div style="padding:0 28px 16px"><div class="ticket-steps ticket-steps-detail">${progress}</div></div>
-        <div class="ticket-detail-actions">
-            <button class="btn" onclick="closeModal('modal-audit-detail')">Done</button>
-            ${nextStatus ? `<button class="btn btn-primary" onclick="advanceAuditStatus('${audit.id}')">Advance to: ${nextStatus}</button>` : ''}
-            ${audit.status === 'Complete' || audit.status === 'Analysis Pending' ? `<button class="btn" onclick="beginAnalysis('${audit.id}')" style="border-color:var(--navy-500);color:var(--navy-500)">Begin Analysis</button>` : ''}
         </div>`;
     openModal('modal-audit-detail');
 }
@@ -4555,8 +4555,10 @@ function advanceAuditStatus(auditId) {
 
     const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || '';
     createNote('Audit', `Audit advanced: "${oldStatus}" \u2192 "${newStatus}" for ${communityName}.`, { sensors: [audit.auditPodId, audit.communityPodId], communities: [audit.communityId] });
-    openAuditDetail(auditId);
+    closeModal('modal-audit-detail');
+    setTimeout(() => { openAuditDetail(auditId); }, 100);
     updateSidebarAuditCount();
+    if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
 }
 
 function beginAnalysis(auditId) {
