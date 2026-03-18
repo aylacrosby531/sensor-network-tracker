@@ -376,7 +376,9 @@ async function handleSignUp() {
 
 async function enterApp() {
     try {
+    const session = await db.getSession();
     sessionStorage.setItem('mfa_verified_at', Date.now().toString());
+    sessionStorage.setItem('mfa_verified_user', session?.user?.id || '');
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('login-loading').style.display = '';
 
@@ -385,7 +387,7 @@ async function enterApp() {
     currentUserId = profile?.id || null;
     const userEmail = profile?.email || '';
 
-    // Load role — check profile first, then allowed_emails, then fallback for bootstrap admin
+    // Load role — check profile first, then allowed_emails as fallback
     currentUserRole = profile?.role || 'user';
     if (currentUserRole === 'user') {
         try {
@@ -393,9 +395,6 @@ async function enterApp() {
             if (emailRow?.role === 'admin') currentUserRole = 'admin';
         } catch(e) { /* role column may not exist yet */ }
     }
-    // Bootstrap admin: if you're the first admin email, always grant admin
-    const BOOTSTRAP_ADMINS = ['ayla.crosby@alaska.gov', 'aylacrosby531@gmail.com'];
-    if (BOOTSTRAP_ADMINS.includes(userEmail.toLowerCase())) currentUserRole = 'admin';
 
     // Load global MFA setting
     try { const mfaSetting = await db.getAppSetting('mfa_required'); mfaRequired = mfaSetting !== 'false'; } catch(e) { mfaRequired = true; }
@@ -443,6 +442,7 @@ function resetInactivityTimer() {
     if (inactivityTimeout) clearTimeout(inactivityTimeout);
     inactivityTimeout = setTimeout(async () => {
         sessionStorage.removeItem('mfa_verified_at');
+        sessionStorage.removeItem('mfa_verified_user');
         alert('You have been signed out due to inactivity.');
         await logoutUser();
     }, INACTIVITY_LIMIT);
@@ -452,10 +452,13 @@ async function logoutUser() {
     await db.signOut();
     currentUser = null;
     currentUserId = null;
+    currentUserRole = 'user';
     selectedSensors.clear();
     viewHistory = [];
     setupMode = false;
     sessionStorage.removeItem('snt_setupMode');
+    sessionStorage.removeItem('mfa_verified_at');
+    sessionStorage.removeItem('mfa_verified_user');
     if (inactivityTimeout) clearTimeout(inactivityTimeout);
     showLoginScreen();
 }
@@ -6048,9 +6051,12 @@ loadDarkMode();
 
     const session = await db.getSession();
     if (session) {
-        // Check if MFA was verified recently (within 1 hour) and browser hasn't been closed
+        // Check if MFA was verified recently (within 1 hour) for THIS user
         const mfaVerifiedAt = sessionStorage.getItem('mfa_verified_at');
-        const mfaStillValid = mfaVerifiedAt && (Date.now() - parseInt(mfaVerifiedAt)) < INACTIVITY_LIMIT;
+        const mfaVerifiedUser = sessionStorage.getItem('mfa_verified_user');
+        const mfaStillValid = mfaVerifiedAt
+            && mfaVerifiedUser === session.user.id
+            && (Date.now() - parseInt(mfaVerifiedAt)) < INACTIVITY_LIMIT;
 
         if (mfaStillValid) {
             await enterApp();
