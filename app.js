@@ -383,6 +383,8 @@ async function logoutUser() {
     currentUserId = null;
     selectedSensors.clear();
     viewHistory = [];
+    setupMode = false;
+    sessionStorage.removeItem('snt_setupMode');
     if (inactivityTimeout) clearTimeout(inactivityTimeout);
     showLoginScreen();
 }
@@ -392,11 +394,12 @@ function getCurrentUserName() {
 }
 
 // ===== SETUP MODE =====
-let setupMode = loadData('setupMode', false);
+// Uses sessionStorage so it auto-resets on browser close and logout
+let setupMode = sessionStorage.getItem('snt_setupMode') === 'true';
 
 function toggleSetupMode() {
     setupMode = !setupMode;
-    saveData('setupMode', setupMode);
+    sessionStorage.setItem('snt_setupMode', setupMode);
     renderSetupModeIndicator();
     // Re-render current view to reflect mode change
     const activeView = document.querySelector('.view.active');
@@ -669,7 +672,34 @@ function showView(viewName) {
 
 // ===== DASHBOARD =====
 function renderDashboard() {
-    // Dashboard is just the embedded AQI map — nothing to render dynamically
+    const totalSensors = sensors.length;
+    const onlineCount = sensors.filter(s => getStatusArray(s).includes('Online')).length;
+    const issueCount = getIssueSensorCount();
+    const communityCount = COMMUNITIES.filter(c => !isChildCommunity(c.id) && !isCommunityDeactivated(c.id)).length;
+    const contactCount = contacts.filter(c => c.active !== false).length;
+
+    document.getElementById('dashboard-summary').innerHTML = `
+        <div class="dash-stat" onclick="showView('all-sensors')">
+            <div class="dash-stat-value">${totalSensors}</div>
+            <div class="dash-stat-label">Total Sensors</div>
+        </div>
+        <div class="dash-stat" onclick="sensorTagFilter=''; showView('all-sensors')">
+            <div class="dash-stat-value">${onlineCount}</div>
+            <div class="dash-stat-label">Online</div>
+        </div>
+        <div class="dash-stat ${issueCount > 0 ? 'dash-stat-issue' : ''}" onclick="filterSensorsByTag('Issue Sensors')">
+            <div class="dash-stat-value">${issueCount}</div>
+            <div class="dash-stat-label">Issues</div>
+        </div>
+        <div class="dash-stat" onclick="showView('communities')">
+            <div class="dash-stat-value">${communityCount}</div>
+            <div class="dash-stat-label">Communities</div>
+        </div>
+        <div class="dash-stat" onclick="showView('contacts')">
+            <div class="dash-stat-value">${contactCount}</div>
+            <div class="dash-stat-label">Active Contacts</div>
+        </div>
+    `;
 }
 
 // ===== COMMUNITIES LIST VIEW =====
@@ -3707,7 +3737,105 @@ function addNewCommunityCustomTag() {
     renderNewCommunityTags();
 }
 
+// ===== DARK MODE =====
+function toggleDarkMode() {
+    document.documentElement.classList.toggle('dark-mode');
+    const isDark = document.documentElement.classList.contains('dark-mode');
+    localStorage.setItem('snt_darkMode', isDark);
+    const label = document.getElementById('dark-mode-label');
+    if (label) label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+}
+
+function loadDarkMode() {
+    if (localStorage.getItem('snt_darkMode') === 'true') {
+        document.documentElement.classList.add('dark-mode');
+        const label = document.getElementById('dark-mode-label');
+        if (label) label.textContent = 'Light Mode';
+    }
+}
+
+// ===== MOBILE SIDEBAR =====
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('mobile-open');
+    document.getElementById('sidebar-overlay').classList.toggle('visible');
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('mobile-open');
+    document.getElementById('sidebar-overlay').classList.remove('visible');
+}
+
+// ===== BATCH IMPORT =====
+async function importSensors(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws);
+
+        let imported = 0;
+        let skipped = 0;
+
+        for (const row of rows) {
+            const id = row['Sensor ID'] || row['sensor_id'] || row['id'];
+            if (!id) { skipped++; continue; }
+            if (sensors.find(s => s.id === id)) { skipped++; continue; }
+
+            const sensor = {
+                id: String(id).trim(),
+                soaTagId: String(row['SOA Tag ID'] || row['soa_tag_id'] || '').trim(),
+                type: row['Type'] || row['type'] || 'Community Pod',
+                status: [],
+                community: '',
+                location: String(row['Location'] || row['location'] || '').trim(),
+                datePurchased: String(row['Purchase Date'] || row['date_purchased'] || '').trim(),
+                collocationDates: String(row['Collocation Dates'] || row['collocation_dates'] || '').trim(),
+                dateInstalled: '',
+            };
+
+            // Try to match community by name
+            const commName = row['Community'] || row['community'] || '';
+            if (commName) {
+                const match = COMMUNITIES.find(c => c.name.toLowerCase() === String(commName).toLowerCase().trim());
+                if (match) sensor.community = match.id;
+            }
+
+            // Parse status
+            const statusStr = row['Status'] || row['status'] || '';
+            if (statusStr) {
+                sensor.status = String(statusStr).split(';').map(s => s.trim()).filter(Boolean);
+            }
+
+            sensors.push(sensor);
+            persistSensor(sensor);
+            imported++;
+        }
+
+        alert(`Import complete: ${imported} sensors added, ${skipped} skipped (duplicate or missing ID).`);
+        event.target.value = '';
+        renderSensors();
+        buildSensorSidebar();
+    } catch (err) {
+        alert('Import failed: ' + err.message);
+        console.error('Import error:', err);
+    }
+}
+
+// ===== PRINT =====
+function printSensorReport() {
+    window.print();
+}
+
+function printContactReport() {
+    window.print();
+}
+
 // ===== INIT =====
+loadDarkMode();
+
 (async function init() {
     // Handle auth redirects (email confirmation links, password resets)
     const hash = window.location.hash;

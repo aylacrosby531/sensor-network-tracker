@@ -61,6 +61,12 @@
     </div>
 
     <div id="app" style="display:none">
+        <div class="mobile-header" id="mobile-header">
+            <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">&#9776;</button>
+            <span class="mobile-title">ADEC Sensor Tracker</span>
+            <button class="dark-mode-btn" onclick="toggleDarkMode()" aria-label="Toggle dark mode" title="Toggle dark mode">&#9790;</button>
+        </div>
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
         <!-- Sidebar -->
         <nav id="sidebar">
             <div class="sidebar-header">
@@ -102,9 +108,15 @@
                     </a>
                 </li>
             </ul>
-            <div id="setup-mode-toggle" class="setup-mode-toggle" onclick="toggleSetupMode()">
-                <span class="setup-mode-icon" aria-hidden="true">&#9881;</span>
+            <div class="sidebar-bottom-actions">
+                <div class="setup-mode-toggle" id="setup-mode-toggle" onclick="toggleSetupMode()">
+                    <span class="setup-mode-icon" aria-hidden="true">&#9881;</span>
                 <span class="setup-mode-label">Setup Mode</span>
+                </div>
+                <div class="dark-mode-toggle" onclick="toggleDarkMode()">
+                    <span aria-hidden="true">&#9790;</span>
+                    <span id="dark-mode-label">Dark Mode</span>
+                </div>
             </div>
         </nav>
 
@@ -119,6 +131,7 @@
             <div id="back-button" class="back-button" style="display:none" onclick="goBack()" role="button" aria-label="Go back">&#8592; Back</div>
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
+                <div class="dashboard-summary" id="dashboard-summary"></div>
                 <iframe
                     src="https://experience.arcgis.com/experience/8655256b056a48f6a19788d43cdab30f"
                     class="map-iframe-full"
@@ -132,7 +145,9 @@
                 <div class="view-header">
                     <h1>All Sensors</h1>
                     <button class="btn btn-primary" onclick="openAddSensorModal()">+ Add Sensor</button>
-                    <button class="btn" onclick="exportSensors()">Export Spreadsheet</button>
+                    <button class="btn" onclick="exportSensors()">Export</button>
+                    <label class="btn" style="cursor:pointer">Import <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importSensors(event)"></label>
+                    <button class="btn" onclick="printSensorReport()">Print</button>
                     <button class="btn btn-primary" id="bulk-action-btn" style="display:none" onclick="openBulkActionModal()">Bulk Action (<span id="bulk-count">0</span>)</button>
                     <button class="btn" id="bulk-clear-btn" style="display:none" onclick="clearSensorSelection()">Clear Selection</button>
                 </div>
@@ -254,7 +269,8 @@
                     <h1>All Contacts</h1>
                     <button class="btn btn-primary" onclick="openAddContactModal()">+ Add Contact</button>
                     <button class="btn btn-primary" onclick="openEmailModal()">&#9993; Email</button>
-                    <button class="btn" onclick="exportContacts()">Export Spreadsheet</button>
+                    <button class="btn" onclick="exportContacts()">Export</button>
+                    <button class="btn" onclick="printContactReport()">Print</button>
                 </div>
                 <div class="filter-bar">
                     <input type="text" id="contact-search" placeholder="Search contacts..." oninput="renderContacts()">
