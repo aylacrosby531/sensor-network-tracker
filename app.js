@@ -5867,6 +5867,7 @@ async function importSensors(event) {
 loadDarkMode();
 
 (async function init() {
+    try {
     // Handle auth redirects (email confirmation links, password resets)
     const hash = window.location.hash;
     if (hash && (hash.includes('access_token') || hash.includes('type=signup') || hash.includes('type=recovery'))) {
@@ -5906,6 +5907,10 @@ loadDarkMode();
             await checkMfaAndProceed();
         }
     } else {
+        showLoginScreen();
+    }
+    } catch (err) {
+        console.error('Init error:', err);
         showLoginScreen();
     }
 
