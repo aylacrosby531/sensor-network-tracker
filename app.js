@@ -4175,6 +4175,13 @@ function openTicketDetail(ticketId) {
 
     document.getElementById('service-ticket-modal-title').textContent = `Service Ticket: ${ticket.sensorId}`;
     document.getElementById('service-ticket-modal-body').innerHTML = `
+        <div style="padding:12px 28px 0"><div class="ticket-steps ticket-steps-detail">${renderTicketProgress(ticket)}</div></div>
+        <div class="ticket-detail-actions" style="border-top:none;padding-top:8px">
+            <button class="btn" onclick="closeModal('modal-service-ticket')">Done</button>
+            ${isOpen && nextStatus ? `<button class="btn btn-primary" onclick="advanceTicketStatus('${ticket.id}')">Advance to: ${nextStatus}</button>` : ''}
+            ${statusIndex > 0 && isOpen ? `<a class="undo-link" onclick="revertTicketStatus('${ticket.id}')">undo last advance</a>` : ''}
+            ${isOpen ? `<button class="btn btn-danger" onclick="openCloseTicketModal('${ticket.id}')">Close Out Ticket</button>` : ''}
+        </div>
         <div class="ticket-detail-grid">
             <div class="ticket-field"><label>Sensor</label><p><a href="#" onclick="closeModal('modal-service-ticket'); showSensorDetail('${ticket.sensorId}'); return false;" style="color:var(--navy-500)">${ticket.sensorId}</a></p></div>
             <div class="ticket-field"><label>Actions Needed</label><p>${formatTicketType(ticket.ticketType)}</p></div>
@@ -4187,16 +4194,6 @@ function openTicketDetail(ticketId) {
             <div class="ticket-field"><label>Closed</label><p>${ticket.closedAt ? new Date(ticket.closedAt).toLocaleDateString() : '—'}</p></div>
             <div class="ticket-field full-width"><label>QuantAQ Notes</label>${isOpen ? `<textarea class="ticket-edit-input" rows="3" placeholder="Notes from QuantAQ..." onblur="saveTicketField('${ticket.id}','quantNotes',this.value)">${escapeHtml(ticket.quantNotes)}</textarea>` : `<p>${escapeHtml(ticket.quantNotes) || '—'}</p>`}</div>
             <div class="ticket-field full-width"><label>Work Completed</label>${isOpen ? `<textarea class="ticket-edit-input" rows="3" placeholder="Describe work done..." onblur="saveTicketField('${ticket.id}','workCompleted',this.value)">${escapeHtml(ticket.workCompleted)}</textarea>` : `<p>${escapeHtml(ticket.workCompleted) || '—'}</p>`}</div>
-        </div>
-        <div class="ticket-detail-status full-width" style="padding:0 28px 16px">
-            <label style="font-size:11px;font-weight:600;color:var(--slate-400);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:block">Ticket Progress</label>
-            <div class="ticket-steps ticket-steps-detail">${renderTicketProgress(ticket)}</div>
-        </div>
-        <div class="ticket-detail-actions">
-            <button class="btn" onclick="closeModal('modal-service-ticket')">Done</button>
-            ${isOpen && nextStatus ? `<button class="btn btn-primary" onclick="advanceTicketStatus('${ticket.id}')">Advance to: ${nextStatus}</button>` : ''}
-            ${statusIndex > 0 && isOpen ? `<a class="undo-link" onclick="revertTicketStatus('${ticket.id}')">undo last advance</a>` : ''}
-            ${isOpen ? `<button class="btn btn-danger" onclick="openCloseTicketModal('${ticket.id}')">Close Out Ticket</button>` : ''}
         </div>`;
     openModal('modal-service-ticket');
 }
