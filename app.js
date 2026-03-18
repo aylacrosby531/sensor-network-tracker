@@ -4236,8 +4236,7 @@ function advanceTicketStatus(ticketId) {
     }
 
     createNote('Service', `Service ticket advanced: "${oldStatus}" → "${newStatus}".`, { sensors: [ticket.sensorId] });
-    closeModal('modal-service-ticket');
-    setTimeout(() => openTicketDetail(ticketId), 100);
+    openTicketDetail(ticketId);
     updateSidebarServiceCount();
     if (document.getElementById('view-service')?.classList.contains('active')) renderServiceView();
 }
@@ -4251,8 +4250,7 @@ function revertTicketStatus(ticketId) {
     ticket.status = TICKET_STATUSES[idx - 1];
     persistServiceTicketUpdate(ticketId, { status: ticket.status });
     createNote('Service', `Service ticket reverted: "${oldStatus}" \u2192 "${ticket.status}".`, { sensors: [ticket.sensorId] });
-    closeModal('modal-service-ticket');
-    setTimeout(() => openTicketDetail(ticketId), 100);
+    openTicketDetail(ticketId);
     updateSidebarServiceCount();
     if (document.getElementById('view-service')?.classList.contains('active')) renderServiceView();
 }
@@ -4583,8 +4581,7 @@ function advanceAuditStatus(auditId) {
 
     const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || '';
     createNote('Audit', `Audit advanced: "${oldStatus}" \u2192 "${newStatus}" for ${communityName}.`, { sensors: [audit.auditPodId, audit.communityPodId], communities: [audit.communityId] });
-    closeModal('modal-audit-detail');
-    setTimeout(() => { openAuditDetail(auditId); }, 100);
+    openAuditDetail(auditId);
     updateSidebarAuditCount();
     if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
 }
@@ -4599,8 +4596,7 @@ function revertAuditStatus(auditId) {
     persistAuditUpdate(auditId, { status: audit.status });
     const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || '';
     createNote('Audit', `Audit reverted: "${oldStatus}" \u2192 "${audit.status}" for ${communityName}.`, { sensors: [audit.auditPodId, audit.communityPodId], communities: [audit.communityId] });
-    closeModal('modal-audit-detail');
-    setTimeout(() => openAuditDetail(auditId), 100);
+    openAuditDetail(auditId);
     updateSidebarAuditCount();
     if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
 }
