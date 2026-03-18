@@ -2831,6 +2831,18 @@ th:hover .field-reorder-btns {
 .dark-mode .ticket-step.pending .ticket-step-label { color: #475569; }
 .dark-mode .ticket-edit-input { background: #151e2b; border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
 
+/* ===== TRACKING LINK ===== */
+.tracking-link {
+    color: var(--navy-500);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.tracking-link:hover {
+    text-decoration: underline;
+}
+
 /* ===== UNDO LINK ===== */
 .undo-link {
     font-size: 11px;
