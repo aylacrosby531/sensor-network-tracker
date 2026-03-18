@@ -383,7 +383,19 @@ async function enterApp() {
     const profile = await db.getProfile();
     currentUser = profile?.name || profile?.email || 'User';
     currentUserId = profile?.id || null;
+    const userEmail = profile?.email || '';
+
+    // Load role — check profile first, then allowed_emails, then fallback for bootstrap admin
     currentUserRole = profile?.role || 'user';
+    if (currentUserRole === 'user') {
+        try {
+            const { data: emailRow } = await supa.from('allowed_emails').select('role').eq('email', userEmail.toLowerCase()).single();
+            if (emailRow?.role === 'admin') currentUserRole = 'admin';
+        } catch(e) { /* role column may not exist yet */ }
+    }
+    // Bootstrap admin: if you're the first admin email, always grant admin
+    const BOOTSTRAP_ADMINS = ['ayla.crosby@alaska.gov', 'aylacrosby531@gmail.com'];
+    if (BOOTSTRAP_ADMINS.includes(userEmail.toLowerCase())) currentUserRole = 'admin';
 
     // Load global MFA setting
     try { const mfaSetting = await db.getAppSetting('mfa_required'); mfaRequired = mfaSetting !== 'false'; } catch(e) { mfaRequired = true; }
@@ -406,8 +418,9 @@ async function enterApp() {
     } catch (err) {
         console.error('App initialization error:', err);
         document.getElementById('login-loading').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('app').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+        showLoginError('Failed to load app data. Please check your connection and try again.');
     }
 }
 
@@ -4621,6 +4634,9 @@ function openAuditDetail(auditId) {
         <div style="padding:0 28px 16px"><label style="font-size:11px;font-weight:600;color:var(--slate-400);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Analysis Results</label>${analysisHtml}</div>
         <div style="padding:0 28px 16px"><label style="font-size:11px;font-weight:600;color:var(--slate-400);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Photos</label>
             ${isEditable ? `<label class="btn btn-sm" style="cursor:pointer;margin-bottom:8px">Upload Photos <input type="file" accept="image/*" multiple style="display:none" onchange="uploadAuditPhotos('${audit.id}', '${audit.communityId}', this.files)"></label>` : ''}
+        </div>
+        <div style="padding:16px 28px;border-top:1px solid var(--slate-100);text-align:right">
+            <button class="btn btn-sm btn-danger" onclick="deleteAudit('${audit.id}')" style="font-size:11px;opacity:0.7">Delete Audit</button>
         </div>`;
     openModal('modal-audit-detail');
 }
@@ -4753,6 +4769,57 @@ const PARAM_COLUMN_MAP = {
     pm10: [/\bPM10_CONTIN\b/i, /\bpm10\b/i, /\bPM\s*10\b/i],
     pm25: [/\bPM25\b/i, /\bpm2\.?5\b/i, /\bPM\s*2\.?5\b/i],
 };
+
+async function deleteAudit(auditId) {
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) return;
+    const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || audit.communityId;
+
+    const confirmed = confirm(
+        `Delete this audit permanently?\n\n` +
+        `Community: ${communityName}\n` +
+        `Pods: ${audit.auditPodId} \u2194 ${audit.communityPodId}\n` +
+        `Dates: ${audit.scheduledStart || '?'} to ${audit.scheduledEnd || '?'}\n\n` +
+        `This will delete all audit data, analysis results, and associated notes. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    // Remove from in-memory array
+    const idx = audits.indexOf(audit);
+    if (idx >= 0) audits.splice(idx, 1);
+
+    // Remove from database
+    try {
+        await supa.from('audits').delete().eq('id', auditId);
+    } catch (err) {
+        console.error('Delete audit error:', err);
+    }
+
+    // Clean up cached analysis data
+    delete analysisDataCache[auditId];
+
+    // Clean up sensor audit statuses if the audit was in progress
+    const auditStatusPrefix = 'Audit: ';
+    const communityPod = sensors.find(x => x.id === audit.communityPodId);
+    const auditPod = sensors.find(x => x.id === audit.auditPodId);
+    if (communityPod) {
+        const cleaned = getStatusArray(communityPod).filter(st => !st.startsWith(auditStatusPrefix));
+        communityPod.status = cleaned.length > 0 ? cleaned : ['Online'];
+        persistSensor(communityPod);
+    }
+    if (auditPod) {
+        const cleaned = getStatusArray(auditPod).filter(st => st !== 'Auditing a Community');
+        auditPod.status = cleaned.length > 0 ? cleaned : ['Online'];
+        persistSensor(auditPod);
+    }
+    buildSensorSidebar();
+
+    closeModal('modal-audit-detail');
+    updateSidebarAuditCount();
+    if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
+    if (currentCommunity) showCommunityView(currentCommunity);
+    if (currentSensor) showSensorView(currentSensor);
+}
 
 function beginAnalysis(auditId) {
     const audit = audits.find(a => a.id === auditId);

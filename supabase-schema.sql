@@ -302,6 +302,8 @@ CREATE POLICY "Authenticated users can insert audits"
     ON audits FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Authenticated users can update audits"
     ON audits FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Authenticated users can delete audits"
+    ON audits FOR DELETE TO authenticated USING (true);
 
 -- ===== SERVICE TICKETS =====
 CREATE TABLE service_tickets (
