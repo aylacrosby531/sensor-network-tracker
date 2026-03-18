@@ -2725,9 +2725,19 @@ async function deleteTimelineItem(id, isNote) {
 
 function refreshCurrentView() {
     buildSensorSidebar();
+    // Preserve active tab before re-rendering
+    const activeTab = document.querySelector('.view.active .tab.active')?.dataset.tab;
     if (currentSensor) showSensorView(currentSensor);
     if (currentCommunity) showCommunityView(currentCommunity);
     if (currentContact) showContactView(currentContact);
+    // Restore active tab
+    if (activeTab) {
+        const container = document.querySelector('.view.active');
+        if (container) {
+            container.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+            container.querySelectorAll('.tab-content').forEach(tc => tc.classList.toggle('active', tc.id === 'tab-' + activeTab));
+        }
+    }
 }
 
 function getTimelineTypeClass(type) {
