@@ -2752,6 +2752,50 @@ th:hover .field-reorder-btns {
     accent-color: var(--navy-600);
 }
 
+/* ===== SERVICE TICKETS ===== */
+.service-badge-count { background: var(--aurora-rose); color: white; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; margin-left: auto; }
+.btn-service { background: rgba(167, 139, 250, 0.1); color: #6d28d9; border: 1px solid rgba(167, 139, 250, 0.3); }
+.btn-service:hover { background: rgba(167, 139, 250, 0.2); }
+.service-pipeline { display: flex; flex-direction: column; gap: 16px; }
+.service-pipeline-column { background: var(--slate-50); border-radius: var(--radius-md); padding: 14px; }
+.service-pipeline-column-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--slate-200); }
+.service-pipeline-column-header h3 { font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+.service-pipeline-count { background: var(--slate-200); color: var(--slate-600); font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; }
+.service-ticket-card { background: var(--surface); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 8px; box-shadow: var(--shadow-sm); cursor: pointer; transition: box-shadow 0.15s; border-left: 3px solid var(--slate-300); }
+.service-ticket-card:hover { box-shadow: var(--shadow-md); }
+.service-ticket-card.ticket-type-issue { border-left-color: var(--aurora-rose); }
+.service-ticket-card.ticket-type-calibration { border-left-color: var(--aurora-amber); }
+.ticket-sensor-id { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--slate-800); }
+.ticket-type-label { font-size: 10px; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.5px; }
+.ticket-meta { display: flex; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--slate-500); flex-wrap: wrap; }
+.ticket-description { font-size: 13px; color: var(--slate-600); margin-top: 6px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ticket-progress { display: flex; gap: 3px; margin-top: 10px; }
+.ticket-progress-step { height: 4px; flex: 1; border-radius: 2px; background: var(--slate-200); }
+.ticket-progress-step.completed { background: var(--navy-500); }
+.ticket-progress-step.current { background: var(--aurora-green); }
+.ticket-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px 28px; }
+.ticket-field { display: flex; flex-direction: column; gap: 4px; }
+.ticket-field label { font-size: 11px; font-weight: 600; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.5px; }
+.ticket-field p { font-size: 14px; color: var(--slate-800); margin: 0; }
+.ticket-field.full-width { grid-column: 1 / -1; }
+.ticket-detail-actions { display: flex; gap: 10px; padding: 16px 28px; border-top: 1px solid var(--slate-200); flex-wrap: wrap; }
+.ticket-status-badge { display: inline-block; font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 12px; }
+.ticket-status-badge.ts-opened { background: rgba(59, 130, 246, 0.1); color: #2563eb; }
+.ticket-status-badge.ts-rma { background: rgba(167, 139, 250, 0.1); color: #6d28d9; }
+.ticket-status-badge.ts-shipped-to { background: rgba(245, 158, 11, 0.1); color: #d97706; }
+.ticket-status-badge.ts-at-quant { background: rgba(244, 63, 94, 0.1); color: #e11d48; }
+.ticket-status-badge.ts-shipped-from { background: rgba(245, 158, 11, 0.1); color: #d97706; }
+.ticket-status-badge.ts-received { background: rgba(34, 197, 94, 0.1); color: #15803d; }
+.ticket-status-badge.ts-closed { background: var(--slate-100); color: var(--slate-500); }
+.ticket-edit-input { font-size: 14px; padding: 6px 10px; border: 1px solid var(--slate-200); border-radius: var(--radius-sm); width: 100%; font-family: var(--font-sans); }
+.ticket-edit-input:focus { border-color: var(--navy-500); outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 176, 0.1); }
+
+.dark-mode .service-pipeline-column { background: #151e2b; }
+.dark-mode .service-ticket-card { background: #1e293b; }
+.dark-mode .ticket-detail-actions { border-top-color: rgba(255,255,255,0.06); }
+.dark-mode .ticket-progress-step { background: #334155; }
+.dark-mode .ticket-edit-input { background: #151e2b; border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
+
 /* ===== SAVE ERROR TOAST ===== */
 .save-error-toast {
     position: fixed;

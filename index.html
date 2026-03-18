@@ -91,6 +91,12 @@
                     <ul class="community-list" id="sensor-tag-list"></ul>
                 </li>
                 <li>
+                    <a href="#" class="menu-item" data-view="service">
+                        <span class="icon">&#9888;</span> Service
+                        <span class="service-badge-count" id="sidebar-service-count" style="display:none"></span>
+                    </a>
+                </li>
+                <li>
                     <a href="#" class="menu-item community-menu-item" data-view="communities">
                         <span class="icon" style="font-size:11px">&#9679;</span>
                         <span class="community-nav-label">Communities</span>
@@ -178,6 +184,25 @@
                         <tbody id="sensors-tbody"></tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- Service Tickets View -->
+            <div id="view-service" class="view">
+                <div class="view-header">
+                    <h1>Service Tickets</h1>
+                    <button class="btn btn-primary" onclick="openNewTicketModal()">+ New Ticket</button>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+                    <select id="service-type-filter" onchange="renderServiceView()" style="padding:6px 10px;border:1px solid var(--slate-200);border-radius:var(--radius-sm);font-size:13px;font-family:var(--font-sans)">
+                        <option value="">All Types</option>
+                        <option value="issue">Issue / Repair</option>
+                        <option value="calibration">Calibration</option>
+                    </select>
+                    <label style="font-size:13px;color:var(--slate-500);display:flex;align-items:center;gap:6px">
+                        <input type="checkbox" id="service-show-closed" onchange="renderServiceView()"> Show Closed
+                    </label>
+                </div>
+                <div id="service-pipeline" class="service-pipeline"></div>
             </div>
 
             <!-- All Communities View -->
@@ -295,11 +320,13 @@
                 <div id="tab-sensor-history" class="tab-content active">
                     <div class="history-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                         <button class="btn btn-primary" onclick="openAddNoteModal(currentSensor, 'sensor')">+ Add Note</button>
+                        <button class="btn btn-service" onclick="openTicketFromSensor(currentSensor)">&#9888; Service Ticket</button>
                         <select id="sensor-history-filter" onchange="filterSensorHistory()">
                             <option value="">All History</option>
                             <option value="_notes">Field Notes</option>
                             <option value="_changes">Changes</option>
                             <option value="Communication">Communications</option>
+                            <option value="_service">Service Tickets</option>
                         </select>
                     </div>
                     <div id="sensor-history-timeline" class="timeline"></div>
@@ -858,6 +885,62 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn" onclick="closeModal('modal-type-change')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Ticket Detail Modal -->
+    <div id="modal-service-ticket" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 id="service-ticket-modal-title">Service Ticket</h2>
+                <button class="modal-close" onclick="closeModal('modal-service-ticket')">&times;</button>
+            </div>
+            <div id="service-ticket-modal-body"></div>
+        </div>
+    </div>
+
+    <!-- New Service Ticket Modal -->
+    <div id="modal-new-service-ticket" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Open Service Ticket</h2>
+                <button class="modal-close" onclick="closeModal('modal-new-service-ticket')">&times;</button>
+            </div>
+            <form onsubmit="saveNewTicket(event)">
+                <div class="form-group"><label>Sensor</label><select id="ticket-sensor-input" required></select></div>
+                <div class="form-group"><label>Ticket Type</label>
+                    <select id="ticket-type-input" required>
+                        <option value="issue">Issue / Repair</option>
+                        <option value="calibration">Calibration</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Issue Description</label><textarea id="ticket-description-input" rows="4" required placeholder="Describe the issue or reason for service..."></textarea></div>
+                <div class="form-group"><label>RMA Number (if known)</label><input type="text" id="ticket-rma-input" placeholder="e.g. RMA-2026-0042"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-new-service-ticket')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Open Ticket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Close Ticket Modal -->
+    <div id="modal-close-ticket" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>Close Service Ticket</h2>
+                <button class="modal-close" onclick="closeModal('modal-close-ticket')">&times;</button>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+                <p style="font-size:14px;color:var(--slate-700)">Closing ticket for <strong id="close-ticket-sensor-label"></strong></p>
+            </div>
+            <div class="form-group"><label>Work Completed Summary</label><textarea id="close-ticket-work" rows="3" placeholder="Describe work completed..."></textarea></div>
+            <div class="form-group"><label>Set Sensor Status To</label><div id="close-ticket-status" class="status-toggle-list"></div></div>
+            <input type="hidden" id="close-ticket-id">
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('modal-close-ticket')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="confirmCloseTicket()">Close Ticket</button>
             </div>
         </div>
     </div>

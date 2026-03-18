@@ -294,4 +294,48 @@ const db = {
         if (error) throw error;
         return data?.signedUrl || '';
     },
+
+    // --- Service Tickets ---
+    async getServiceTickets() {
+        const { data, error } = await supa.from('service_tickets').select('*, profiles(name)').order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(t => ({
+            id: t.id, sensorId: t.sensor_id, ticketType: t.ticket_type, status: t.status,
+            rmaNumber: t.rma_number || '', fedexTrackingTo: t.fedex_tracking_to || '',
+            fedexTrackingFrom: t.fedex_tracking_from || '', issueDescription: t.issue_description || '',
+            quantNotes: t.quant_notes || '', workCompleted: t.work_completed || '',
+            createdBy: t.profiles?.name || '', createdById: t.created_by,
+            createdAt: t.created_at, closedAt: t.closed_at, updatedAt: t.updated_at,
+        }));
+    },
+
+    async insertServiceTicket(ticket) {
+        const { data, error } = await supa.from('service_tickets').insert({
+            sensor_id: ticket.sensorId, ticket_type: ticket.ticketType,
+            status: ticket.status || 'Ticket Opened', rma_number: ticket.rmaNumber || '',
+            fedex_tracking_to: ticket.fedexTrackingTo || '', fedex_tracking_from: ticket.fedexTrackingFrom || '',
+            issue_description: ticket.issueDescription || '', quant_notes: ticket.quantNotes || '',
+            work_completed: ticket.workCompleted || '', created_by: ticket.createdById || null,
+        }).select('*, profiles(name)');
+        if (error) throw error;
+        const t = data[0];
+        return {
+            id: t.id, sensorId: t.sensor_id, ticketType: t.ticket_type, status: t.status,
+            rmaNumber: t.rma_number || '', fedexTrackingTo: t.fedex_tracking_to || '',
+            fedexTrackingFrom: t.fedex_tracking_from || '', issueDescription: t.issue_description || '',
+            quantNotes: t.quant_notes || '', workCompleted: t.work_completed || '',
+            createdBy: t.profiles?.name || '', createdById: t.created_by,
+            createdAt: t.created_at, closedAt: t.closed_at, updatedAt: t.updated_at,
+        };
+    },
+
+    async updateServiceTicket(id, updates) {
+        const row = { updated_at: new Date().toISOString() };
+        for (const [k, v] of Object.entries(updates)) {
+            const map = { rmaNumber: 'rma_number', fedexTrackingTo: 'fedex_tracking_to', fedexTrackingFrom: 'fedex_tracking_from', issueDescription: 'issue_description', quantNotes: 'quant_notes', workCompleted: 'work_completed', closedAt: 'closed_at', status: 'status' };
+            if (map[k]) row[map[k]] = v;
+        }
+        const { error } = await supa.from('service_tickets').update(row).eq('id', id);
+        if (error) throw error;
+    },
 };

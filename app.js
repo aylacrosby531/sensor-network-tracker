@@ -9,6 +9,7 @@ let notes = [];
 let comms = [];
 let communityFiles = {};
 let communityTags = {};
+let serviceTickets = [];
 let communityParents = {}; // childId -> parentId
 
 function loadData(key, fallback) {
@@ -24,7 +25,7 @@ function saveData(key, data) {
 
 // Load all data from Supabase into memory
 async function loadAllData() {
-    const [communitiesData, tagsData, sensorsData, contactsData, notesData, commsData, filesData] = await Promise.all([
+    const [communitiesData, tagsData, sensorsData, contactsData, notesData, commsData, filesData, ticketsData] = await Promise.all([
         db.getCommunities(),
         db.getCommunityTags(),
         db.getSensors(),
@@ -32,6 +33,7 @@ async function loadAllData() {
         db.getNotes(),
         db.getComms(),
         db.getCommunityFiles(),
+        db.getServiceTickets(),
     ]);
 
     // Communities
@@ -100,6 +102,9 @@ async function loadAllData() {
             date: f.created_at,
         });
     });
+
+    // Service tickets
+    serviceTickets = ticketsData;
 }
 
 // ===== PERSISTENCE LAYER =====
@@ -119,6 +124,7 @@ function persistNote(n) { return db.insertNote(n).catch(handleSaveError); }
 function persistComm(c) { return db.insertComm(c).catch(handleSaveError); }
 function persistCommunityTags(id, tags) { db.setCommunityTags(id, tags).catch(handleSaveError); }
 function persistCommunity(c) { db.insertCommunity(c).catch(handleSaveError); }
+function persistServiceTicketUpdate(id, updates) { db.updateServiceTicket(id, updates).catch(handleSaveError); }
 
 // ===== UTILITIES =====
 function generateId(prefix) {
@@ -141,6 +147,11 @@ function createNote(type, text, tags, additionalInfo) {
     notes.push(note);
     persistNote(note);
     return note;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function hideAllAuthForms() {
@@ -356,6 +367,7 @@ async function enterApp() {
     buildSidebar();
     buildSensorSidebar();
     renderPinnedSidebar();
+    updateSidebarServiceCount();
     restoreLastView();
     startInactivityTimer();
 }
@@ -619,6 +631,7 @@ document.querySelectorAll('.menu-item[data-view]').forEach(item => {
         if (view === 'dashboard') showView('dashboard');
         if (view === 'all-sensors') return;
         if (view === 'contacts') showView('contacts');
+        if (view === 'service') showView('service');
         if (view === 'communities') return; // handled by community-menu-item listener
     });
 });
@@ -673,6 +686,7 @@ function showView(viewName) {
     if (viewName === 'contacts') renderContacts();
     if (viewName === 'communities') renderCommunitiesList();
     if (viewName === 'settings') renderSettings();
+    if (viewName === 'service') renderServiceView();
 
     saveLastView('view', viewName);
 }
@@ -700,6 +714,10 @@ function renderDashboard() {
         <div class="dash-stat" onclick="showView('communities')">
             <div class="dash-stat-value">${communityCount}</div>
             <div class="dash-stat-label">Communities</div>
+        </div>
+        <div class="dash-stat" onclick="showView('service')">
+            <div class="dash-stat-value">${getActiveTicketCount()}</div>
+            <div class="dash-stat-label">Service Tickets</div>
         </div>
     `;
 }
@@ -2689,6 +2707,7 @@ function getTimelineTypeClass(type) {
         'Installation': 'type-audit',
         'Removal': 'type-movement',
         'Maintenance': 'type-audit',
+        'Service': 'type-status',
     };
     return map[type] || '';
 }
@@ -3076,6 +3095,7 @@ function getSelectedStatuses(containerId) {
 const FILTER_GROUPS = {
     '_notes': ['General', 'Audit', 'Site Work', 'Issue', 'Installation', 'Removal', 'Maintenance'],
     '_changes': ['Info Edit', 'Status Change', 'Movement'],
+    '_service': ['Service'],
 };
 
 function filterSensorHistory() {
@@ -4033,6 +4053,195 @@ function saveCustomFieldData() {
         }
     });
     saveData('sensorCustomData', data);
+}
+
+// ===== SERVICE TICKETS =====
+const TICKET_STATUSES = ['Ticket Opened', 'RMA Assigned', 'Shipped to Quant', 'At Quant', 'Shipped from Quant', 'Received', 'Closed'];
+const TICKET_STATUS_CSS = { 'Ticket Opened': 'ts-opened', 'RMA Assigned': 'ts-rma', 'Shipped to Quant': 'ts-shipped-to', 'At Quant': 'ts-at-quant', 'Shipped from Quant': 'ts-shipped-from', 'Received': 'ts-received', 'Closed': 'ts-closed' };
+
+function getActiveTicketCount() { return serviceTickets.filter(t => t.status !== 'Closed').length; }
+function getActiveTicketsForSensor(sensorId) { return serviceTickets.filter(t => t.sensorId === sensorId && t.status !== 'Closed'); }
+
+function updateSidebarServiceCount() {
+    const count = getActiveTicketCount();
+    const el = document.getElementById('sidebar-service-count');
+    if (!el) return;
+    el.textContent = count;
+    el.style.display = count > 0 ? '' : 'none';
+}
+
+function renderServiceView() {
+    updateSidebarServiceCount();
+    const typeFilter = document.getElementById('service-type-filter')?.value || '';
+    const showClosed = document.getElementById('service-show-closed')?.checked || false;
+    let tickets = [...serviceTickets];
+    if (typeFilter) tickets = tickets.filter(t => t.ticketType === typeFilter);
+    if (!showClosed) tickets = tickets.filter(t => t.status !== 'Closed');
+
+    const pipeline = document.getElementById('service-pipeline');
+    const statusesToShow = showClosed ? TICKET_STATUSES : TICKET_STATUSES.filter(s => s !== 'Closed');
+
+    pipeline.innerHTML = statusesToShow.map(status => {
+        const st = tickets.filter(t => t.status === status);
+        return `<div class="service-pipeline-column">
+            <div class="service-pipeline-column-header"><h3>${status}</h3><span class="service-pipeline-count">${st.length}</span></div>
+            ${st.length === 0 ? '<p style="font-size:13px;color:var(--slate-400)">No tickets</p>' : st.map(t => renderTicketCard(t)).join('')}
+        </div>`;
+    }).join('');
+}
+
+function renderTicketCard(ticket) {
+    const statusIndex = TICKET_STATUSES.indexOf(ticket.status);
+    const progress = TICKET_STATUSES.slice(0, -1).map((_, i) =>
+        `<div class="ticket-progress-step ${i < statusIndex ? 'completed' : i === statusIndex ? 'current' : ''}"></div>`
+    ).join('');
+    return `<div class="service-ticket-card ticket-type-${ticket.ticketType}" onclick="openTicketDetail('${ticket.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="ticket-sensor-id">${ticket.sensorId}</span>
+            <span class="ticket-type-label">${ticket.ticketType}</span>
+        </div>
+        ${ticket.issueDescription ? `<div class="ticket-description">${escapeHtml(ticket.issueDescription)}</div>` : ''}
+        <div class="ticket-meta">
+            ${ticket.rmaNumber ? `<span>RMA: ${escapeHtml(ticket.rmaNumber)}</span>` : ''}
+            ${ticket.fedexTrackingTo ? `<span>To Quant: ${escapeHtml(ticket.fedexTrackingTo)}</span>` : ''}
+            ${ticket.fedexTrackingFrom ? `<span>From Quant: ${escapeHtml(ticket.fedexTrackingFrom)}</span>` : ''}
+            <span>${new Date(ticket.createdAt).toLocaleDateString()}</span>
+        </div>
+        <div class="ticket-progress">${progress}</div>
+    </div>`;
+}
+
+function openTicketDetail(ticketId) {
+    const ticket = serviceTickets.find(t => t.id === ticketId);
+    if (!ticket) return;
+    const statusIndex = TICKET_STATUSES.indexOf(ticket.status);
+    const nextStatus = statusIndex < TICKET_STATUSES.length - 2 ? TICKET_STATUSES[statusIndex + 1] : null;
+    const isOpen = ticket.status !== 'Closed';
+
+    document.getElementById('service-ticket-modal-title').textContent = `Service Ticket: ${ticket.sensorId}`;
+    document.getElementById('service-ticket-modal-body').innerHTML = `
+        <div class="ticket-detail-grid">
+            <div class="ticket-field"><label>Sensor</label><p><a href="#" onclick="closeModal('modal-service-ticket'); showSensorDetail('${ticket.sensorId}'); return false;" style="color:var(--navy-500)">${ticket.sensorId}</a></p></div>
+            <div class="ticket-field"><label>Type</label><p>${ticket.ticketType === 'issue' ? 'Issue / Repair' : 'Calibration'}</p></div>
+            <div class="ticket-field"><label>Status</label><p><span class="ticket-status-badge ${TICKET_STATUS_CSS[ticket.status] || ''}">${ticket.status}</span></p></div>
+            <div class="ticket-field"><label>Opened</label><p>${escapeHtml(ticket.createdBy)} on ${new Date(ticket.createdAt).toLocaleDateString()}</p></div>
+            <div class="ticket-field full-width"><label>Issue Description</label><p>${escapeHtml(ticket.issueDescription) || '—'}</p></div>
+            <div class="ticket-field"><label>RMA Number</label>${isOpen ? `<input class="ticket-edit-input" value="${escapeHtml(ticket.rmaNumber)}" placeholder="e.g. RMA-2026-0042" onblur="saveTicketField('${ticket.id}','rmaNumber',this.value)">` : `<p>${escapeHtml(ticket.rmaNumber) || '—'}</p>`}</div>
+            <div class="ticket-field"><label>FedEx Tracking (to QuantAQ)</label>${isOpen ? `<input class="ticket-edit-input" value="${escapeHtml(ticket.fedexTrackingTo)}" placeholder="Tracking number" onblur="saveTicketField('${ticket.id}','fedexTrackingTo',this.value)">` : `<p>${escapeHtml(ticket.fedexTrackingTo) || '—'}</p>`}</div>
+            <div class="ticket-field"><label>FedEx Tracking (from QuantAQ)</label>${isOpen ? `<input class="ticket-edit-input" value="${escapeHtml(ticket.fedexTrackingFrom)}" placeholder="Tracking number" onblur="saveTicketField('${ticket.id}','fedexTrackingFrom',this.value)">` : `<p>${escapeHtml(ticket.fedexTrackingFrom) || '—'}</p>`}</div>
+            <div class="ticket-field"><label>Closed</label><p>${ticket.closedAt ? new Date(ticket.closedAt).toLocaleDateString() : '—'}</p></div>
+            <div class="ticket-field full-width"><label>QuantAQ Notes</label>${isOpen ? `<textarea class="ticket-edit-input" rows="3" placeholder="Notes from QuantAQ..." onblur="saveTicketField('${ticket.id}','quantNotes',this.value)">${escapeHtml(ticket.quantNotes)}</textarea>` : `<p>${escapeHtml(ticket.quantNotes) || '—'}</p>`}</div>
+            <div class="ticket-field full-width"><label>Work Completed</label>${isOpen ? `<textarea class="ticket-edit-input" rows="3" placeholder="Describe work done..." onblur="saveTicketField('${ticket.id}','workCompleted',this.value)">${escapeHtml(ticket.workCompleted)}</textarea>` : `<p>${escapeHtml(ticket.workCompleted) || '—'}</p>`}</div>
+        </div>
+        <div class="ticket-detail-actions">
+            ${isOpen && nextStatus ? `<button class="btn btn-primary" onclick="advanceTicketStatus('${ticket.id}')">Advance to: ${nextStatus}</button>` : ''}
+            ${isOpen ? `<button class="btn btn-danger" onclick="openCloseTicketModal('${ticket.id}')">Close Ticket</button>` : ''}
+        </div>`;
+    openModal('modal-service-ticket');
+}
+
+function saveTicketField(ticketId, field, value) {
+    const ticket = serviceTickets.find(t => t.id === ticketId);
+    if (!ticket || ticket[field] === value) return;
+    ticket[field] = value;
+    persistServiceTicketUpdate(ticketId, { [field]: value });
+}
+
+function advanceTicketStatus(ticketId) {
+    const ticket = serviceTickets.find(t => t.id === ticketId);
+    if (!ticket) return;
+    const idx = TICKET_STATUSES.indexOf(ticket.status);
+    if (idx >= TICKET_STATUSES.length - 2) return;
+    const oldStatus = ticket.status;
+    const newStatus = TICKET_STATUSES[idx + 1];
+    ticket.status = newStatus;
+    persistServiceTicketUpdate(ticketId, { status: newStatus });
+
+    const sensorStatusMap = { 'Shipped to Quant': ['In Transit'], 'At Quant': ['Service at Quant'] };
+    if (sensorStatusMap[newStatus]) {
+        const s = sensors.find(x => x.id === ticket.sensorId);
+        if (s) { s.status = sensorStatusMap[newStatus]; persistSensor(s); buildSensorSidebar(); }
+    }
+
+    createNote('Service', `Service ticket advanced: "${oldStatus}" → "${newStatus}".`, { sensors: [ticket.sensorId] });
+    openTicketDetail(ticketId);
+    updateSidebarServiceCount();
+}
+
+function openNewTicketModal(preselectedSensorId) {
+    const select = document.getElementById('ticket-sensor-input');
+    select.innerHTML = '<option value="">— Select Sensor —</option>' + sensors.sort((a, b) => a.id.localeCompare(b.id)).map(s => `<option value="${s.id}">${s.id}</option>`).join('');
+    if (preselectedSensorId) select.value = preselectedSensorId;
+    document.getElementById('ticket-type-input').value = 'issue';
+    document.getElementById('ticket-description-input').value = '';
+    document.getElementById('ticket-rma-input').value = '';
+    openModal('modal-new-service-ticket');
+}
+
+function openTicketFromSensor(sensorId) { openNewTicketModal(sensorId); }
+
+async function saveNewTicket(event) {
+    event.preventDefault();
+    const sensorId = document.getElementById('ticket-sensor-input').value;
+    const ticketType = document.getElementById('ticket-type-input').value;
+    const description = document.getElementById('ticket-description-input').value.trim();
+    const rmaNumber = document.getElementById('ticket-rma-input').value.trim();
+    if (!sensorId || !description) return;
+
+    const ticket = { sensorId, ticketType, status: rmaNumber ? 'RMA Assigned' : 'Ticket Opened',
+        rmaNumber, fedexTrackingTo: '', fedexTrackingFrom: '', issueDescription: description,
+        quantNotes: '', workCompleted: '', createdBy: getCurrentUserName(), createdById: currentUserId,
+        createdAt: new Date().toISOString(), closedAt: null };
+    try {
+        const saved = await db.insertServiceTicket(ticket);
+        serviceTickets.unshift(saved);
+    } catch (err) { handleSaveError(err); ticket.id = generateId('tkt'); serviceTickets.unshift(ticket); }
+
+    const s = sensors.find(x => x.id === sensorId);
+    if (s && !getStatusArray(s).includes('Service at Quant')) {
+        s.status = ['Service at Quant']; persistSensor(s); buildSensorSidebar();
+    }
+
+    createNote('Service', `Service ticket opened (${ticketType}): ${description}`, { sensors: [sensorId] });
+    closeModal('modal-new-service-ticket');
+    updateSidebarServiceCount();
+    if (document.getElementById('view-service')?.classList.contains('active')) renderServiceView();
+    if (currentSensor === sensorId) showSensorView(sensorId);
+}
+
+function openCloseTicketModal(ticketId) {
+    const ticket = serviceTickets.find(t => t.id === ticketId);
+    if (!ticket) return;
+    document.getElementById('close-ticket-sensor-label').textContent = ticket.sensorId;
+    document.getElementById('close-ticket-id').value = ticketId;
+    document.getElementById('close-ticket-work').value = ticket.workCompleted || '';
+    renderStatusToggleList('close-ticket-status', ['Online']);
+    closeModal('modal-service-ticket');
+    openModal('modal-close-ticket');
+}
+
+function confirmCloseTicket() {
+    const ticketId = document.getElementById('close-ticket-id').value;
+    const ticket = serviceTickets.find(t => t.id === ticketId);
+    if (!ticket) return;
+    const workCompleted = document.getElementById('close-ticket-work').value.trim();
+    const newStatuses = getSelectedStatuses('close-ticket-status');
+
+    ticket.status = 'Closed';
+    ticket.closedAt = new Date().toISOString();
+    if (workCompleted) ticket.workCompleted = workCompleted;
+    persistServiceTicketUpdate(ticketId, { status: 'Closed', closedAt: ticket.closedAt, workCompleted: ticket.workCompleted });
+
+    if (newStatuses.length > 0) {
+        const s = sensors.find(x => x.id === ticket.sensorId);
+        if (s) { s.status = newStatuses; persistSensor(s); buildSensorSidebar(); }
+    }
+
+    createNote('Service', `Service ticket closed.${workCompleted ? ' Work completed: ' + workCompleted : ''}`, { sensors: [ticket.sensorId] });
+    closeModal('modal-close-ticket');
+    updateSidebarServiceCount();
+    renderServiceView();
+    if (currentSensor === ticket.sensorId) showSensorView(ticket.sensorId);
 }
 
 // ===== DARK MODE =====
