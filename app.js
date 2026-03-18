@@ -25,7 +25,7 @@ function saveData(key, data) {
 
 // Load all data from Supabase into memory
 async function loadAllData() {
-    const [communitiesData, tagsData, sensorsData, contactsData, notesData, commsData, filesData, ticketsData] = await Promise.all([
+    const results = await Promise.allSettled([
         db.getCommunities(),
         db.getCommunityTags(),
         db.getSensors(),
@@ -35,6 +35,16 @@ async function loadAllData() {
         db.getCommunityFiles(),
         db.getServiceTickets(),
     ]);
+    const getValue = (i) => results[i].status === 'fulfilled' ? results[i].value : [];
+    const communitiesData = getValue(0);
+    const tagsData = getValue(1);
+    const sensorsData = getValue(2);
+    const contactsData = getValue(3);
+    const notesData = getValue(4);
+    const commsData = getValue(5);
+    const filesData = getValue(6);
+    const ticketsData = getValue(7);
+    results.forEach((r, i) => { if (r.status === 'rejected') console.warn('Data load warning:', r.reason); });
 
     // Communities
     COMMUNITIES = communitiesData.map(c => ({ id: c.id, name: c.name }));
@@ -348,6 +358,7 @@ async function handleSignUp() {
 }
 
 async function enterApp() {
+    try {
     sessionStorage.setItem('mfa_verified_at', Date.now().toString());
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('login-loading').style.display = '';
@@ -370,6 +381,12 @@ async function enterApp() {
     updateSidebarServiceCount();
     restoreLastView();
     startInactivityTimer();
+    } catch (err) {
+        console.error('App initialization error:', err);
+        document.getElementById('login-loading').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+    }
 }
 
 // ===== INACTIVITY TIMER (1 hour) =====
