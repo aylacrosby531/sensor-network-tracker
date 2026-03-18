@@ -1121,7 +1121,7 @@ function renderSensorCell(s, col) {
                 ${('<option value="">— None —</option>' + COMMUNITIES.map(c => `<option value="${c.id}" ${s.community === c.id ? 'selected' : ''}>${c.name}</option>`).join(''))}
             </select></td>`;
         }
-        if (key === 'dateInstalled') return `<td>${val || '—'}</td>`;
+        if (key === 'dateInstalled') return `<td><input class="inline-edit-input" type="date" data-sensor="${s.id}" data-field="dateInstalled" value="${val}" onblur="inlineSaveSensor(this)"></td>`;
         if (col.isCustom) return `<td><input class="inline-edit-input" value="${val}" placeholder="${col.label}" onblur="editCustomFieldInline('${s.id}','${key}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></td>`;
         if (key === 'datePurchased') return `<td><input class="inline-edit-input" type="date" data-sensor="${s.id}" data-field="${key}" value="${val}" onblur="inlineSaveSensor(this)"></td>`;
         return `<td><input class="inline-edit-input" data-sensor="${s.id}" data-field="${key}" value="${val}" placeholder="${col.label}" onblur="inlineSaveSensor(this)" onkeydown="if(event.key==='Enter')this.blur()"></td>`;
@@ -1601,7 +1601,7 @@ function showSensorView(sensorId) {
                 <input class="inline-edit-input" data-sensor="${s.id}" data-field="location" value="${s.location || ''}" placeholder="Address or GPS coordinates" onblur="inlineSaveSensor(this)" onkeydown="if(event.key==='Enter')this.blur()">
             </div>
             <div class="info-item"><label>Install Date</label>
-                <p>${s.dateInstalled || '—'}</p>
+                <input class="inline-edit-input" type="date" data-sensor="${s.id}" data-field="dateInstalled" value="${s.dateInstalled || ''}" onblur="inlineSaveSensor(this)">
             </div>
             <div class="info-item"><label>Purchase Date</label>
                 <input class="inline-edit-input" type="date" data-sensor="${s.id}" data-field="datePurchased" value="${s.datePurchased || ''}" onblur="inlineSaveSensor(this)">
