@@ -259,6 +259,7 @@
                     <button class="tab" data-tab="community-history">Community History</button>
                     <button class="tab" data-tab="community-comms">Communications</button>
                     <button class="tab" data-tab="community-files">Files</button>
+                    <button class="tab" data-tab="community-audits">Audits</button>
                 </div>
 
                 <div id="tab-community-sensors" class="tab-content active">
@@ -294,6 +295,10 @@
                         </label>
                     </div>
                     <div id="community-files-grid" class="files-grid"></div>
+                </div>
+
+                <div id="tab-community-audits" class="tab-content">
+                    <div id="community-audits-section"></div>
                 </div>
             </div>
 
@@ -334,6 +339,7 @@
 
                 <div class="tabs">
                     <button class="tab active" data-tab="sensor-history">Device History</button>
+                    <button class="tab" data-tab="sensor-audits">Audits</button>
                 </div>
 
                 <div id="tab-sensor-history" class="tab-content active">
@@ -349,6 +355,10 @@
                         </select>
                     </div>
                     <div id="sensor-history-timeline" class="timeline"></div>
+                </div>
+
+                <div id="tab-sensor-audits" class="tab-content">
+                    <div id="sensor-audits-section"></div>
                 </div>
             </div>
 
@@ -943,6 +953,17 @@
         </div>
     </div>
 
+    <!-- Audit Analysis Modal -->
+    <div id="modal-audit-analysis" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-content modal-xl">
+            <div class="modal-header">
+                <h2 id="analysis-modal-title">Audit Analysis</h2>
+                <button class="modal-close" onclick="closeAnalysisModal()">&times;</button>
+            </div>
+            <div id="audit-analysis-body" style="padding:0 28px 28px"></div>
+        </div>
+    </div>
+
     <!-- Service Ticket Detail Modal -->
     <div id="modal-service-ticket" class="modal" role="dialog" aria-modal="true">
         <div class="modal-content modal-lg">
@@ -1001,6 +1022,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="supabase-client.js"></script>
     <script src="app.js"></script>
 </body>

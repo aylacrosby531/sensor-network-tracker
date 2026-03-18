@@ -65,6 +65,7 @@ CREATE TABLE sensors (
     community_id text REFERENCES communities(id),
     location text DEFAULT '',
     date_purchased text DEFAULT '',
+    date_installed text DEFAULT '',
     collocation_dates text DEFAULT '',
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()
@@ -236,6 +237,70 @@ CREATE POLICY "Authenticated users can insert community_files"
     ON community_files FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Authenticated users can delete community_files"
     ON community_files FOR DELETE TO authenticated USING (true);
+
+-- ===== AUDITS =====
+CREATE TABLE audits (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    audit_pod_id text NOT NULL,
+    community_pod_id text NOT NULL,
+    community_id text REFERENCES communities(id),
+    status text DEFAULT 'Scheduled',
+    scheduled_start text,
+    scheduled_end text,
+    actual_start text,
+    actual_end text,
+    conducted_by text DEFAULT '',
+    notes text DEFAULT '',
+    analysis_results jsonb DEFAULT '{}',
+    analysis_name text DEFAULT '',
+    analysis_upload_date timestamptz,
+    analysis_uploaded_by text DEFAULT '',
+    created_by uuid REFERENCES profiles(id),
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_audits_community ON audits(community_id);
+CREATE INDEX idx_audits_status ON audits(status);
+
+ALTER TABLE audits ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can read audits"
+    ON audits FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated users can insert audits"
+    ON audits FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated users can update audits"
+    ON audits FOR UPDATE TO authenticated USING (true);
+
+-- ===== SERVICE TICKETS =====
+CREATE TABLE service_tickets (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    sensor_id text REFERENCES sensors(id),
+    ticket_type text NOT NULL,
+    status text DEFAULT 'Ticket Opened',
+    rma_number text DEFAULT '',
+    fedex_tracking_to text DEFAULT '',
+    fedex_tracking_from text DEFAULT '',
+    issue_description text DEFAULT '',
+    quant_notes text DEFAULT '',
+    work_completed text DEFAULT '',
+    created_by uuid REFERENCES profiles(id),
+    created_at timestamptz DEFAULT now(),
+    closed_at timestamptz,
+    updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_service_tickets_sensor ON service_tickets(sensor_id);
+CREATE INDEX idx_service_tickets_status ON service_tickets(status);
+
+ALTER TABLE service_tickets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can read service_tickets"
+    ON service_tickets FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated users can insert service_tickets"
+    ON service_tickets FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated users can update service_tickets"
+    ON service_tickets FOR UPDATE TO authenticated USING (true);
 
 -- ===== STORAGE BUCKET =====
 INSERT INTO storage.buckets (id, name, public) VALUES ('community-files', 'community-files', false);

@@ -306,6 +306,9 @@ const db = {
             actualStart: a.actual_start, actualEnd: a.actual_end,
             conductedBy: a.conducted_by || '', notes: a.notes || '',
             analysisResults: a.analysis_results || {},
+            analysisName: a.analysis_name || '',
+            analysisUploadDate: a.analysis_upload_date || null,
+            analysisUploadedBy: a.analysis_uploaded_by || '',
             createdBy: a.profiles?.name || '', createdById: a.created_by,
             createdAt: a.created_at, updatedAt: a.updated_at,
         }));
@@ -318,7 +321,9 @@ const db = {
             scheduled_start: audit.scheduledStart || null, scheduled_end: audit.scheduledEnd || null,
             actual_start: audit.actualStart || null, actual_end: audit.actualEnd || null,
             conducted_by: audit.conductedBy || '', notes: audit.notes || '',
-            analysis_results: audit.analysisResults || {}, created_by: audit.createdById || null,
+            analysis_results: audit.analysisResults || {},
+            analysis_name: audit.analysisName || '', analysis_upload_date: audit.analysisUploadDate || null,
+            analysis_uploaded_by: audit.analysisUploadedBy || '', created_by: audit.createdById || null,
         }).select('*, profiles(name)');
         if (error) throw error;
         const a = data[0];
@@ -329,6 +334,9 @@ const db = {
             actualStart: a.actual_start, actualEnd: a.actual_end,
             conductedBy: a.conducted_by || '', notes: a.notes || '',
             analysisResults: a.analysis_results || {},
+            analysisName: a.analysis_name || '',
+            analysisUploadDate: a.analysis_upload_date || null,
+            analysisUploadedBy: a.analysis_uploaded_by || '',
             createdBy: a.profiles?.name || '', createdById: a.created_by,
             createdAt: a.created_at, updatedAt: a.updated_at,
         };
@@ -338,7 +346,9 @@ const db = {
         const row = { updated_at: new Date().toISOString() };
         const map = { status: 'status', scheduledStart: 'scheduled_start', scheduledEnd: 'scheduled_end',
             actualStart: 'actual_start', actualEnd: 'actual_end', conductedBy: 'conducted_by',
-            notes: 'notes', analysisResults: 'analysis_results' };
+            notes: 'notes', analysisResults: 'analysis_results',
+            analysisName: 'analysis_name', analysisUploadDate: 'analysis_upload_date',
+            analysisUploadedBy: 'analysis_uploaded_by' };
         for (const [k, v] of Object.entries(updates)) { if (map[k]) row[map[k]] = v; }
         const { error } = await supa.from('audits').update(row).eq('id', id);
         if (error) throw error;

@@ -1140,7 +1140,7 @@ function renderSensors() {
                 <select class="inline-edit-select inline-edit-sm" data-sensor="${s.id}" data-field="type" onchange="inlineSaveSensor(this)">
                     ${SENSOR_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}
                 </select></td>`
-            : `<td><span class="clickable" onclick="showSensorDetail('${s.id}')">${s.id}</span><br><small style="color:#888">${s.type}</small></td>`;
+            : `<td><span class="clickable" onclick="showSensorDetail('${s.id}')">${s.id}</span><br><small style="color:var(--slate-400)">${s.type}</small></td>`;
         const dataCells = cols.map(col => renderSensorCell(s, col)).join('');
         const actions = setupMode
             ? `<td><button class="btn btn-sm" onclick="openMoveSensorModal('${s.id}')">Move</button></td>`
@@ -1599,6 +1599,9 @@ function showSensorView(sensorId) {
 
     filterSensorHistory();
 
+    // Audits
+    renderSensorAudits(sensorId);
+
     resetTabs(document.getElementById('view-sensor-detail'));
 
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -1757,7 +1760,7 @@ function showCommunityView(communityId) {
             }).join('');
         }
         return list.map(s => `<tr>
-            <td><span class="clickable" onclick="showSensorDetail('${s.id}')">${s.id}</span><br><small style="color:#888">${s.type}</small></td>
+            <td><span class="clickable" onclick="showSensorDetail('${s.id}')">${s.id}</span><br><small style="color:var(--slate-400)">${s.type}</small></td>
             <td>${s.soaTagId || '—'}</td>
             <td>${renderStatusBadges(s, true)}</td>
             <td>${s.location || '—'}</td>
@@ -1850,6 +1853,9 @@ function showCommunityView(communityId) {
 
     // Files
     renderCommunityFiles(communityId);
+
+    // Audits
+    renderCommunityAudits(communityId);
 
     resetTabs(document.getElementById('view-community'));
 
@@ -2678,7 +2684,7 @@ function renderTimeline(containerId, items) {
                     </div>
                     ${actions}
                 </div>
-                <div class="timeline-text">${highlightMentions(item.text)}${hasFullBody ? ' <small style="color:#2563eb">(click to expand)</small>' : ''}</div>
+                <div class="timeline-text">${highlightMentions(item.text)}${hasFullBody ? ' <small style="color:var(--navy-500)">(click to expand)</small>' : ''}</div>
                 ${additionalInfoHtml}
                 ${hasFullBody ? `<div class="timeline-text-full">${item.fullBody}</div>` : ''}
                 ${attribution}
@@ -2781,7 +2787,7 @@ function buildTagsHTML(item) {
 }
 
 function highlightMentions(text) {
-    return text.replace(/@([\w\s]+?)(?=\.|,|$|@)/g, '<strong style="color:#6c3483">@$1</strong>');
+    return text.replace(/@([\w\s]+?)(?=\.|,|$|@)/g, '<strong style="color:var(--navy-600)">@$1</strong>');
 }
 
 function nowDatetime() {
@@ -4259,7 +4265,7 @@ function revertTicketStatus(ticketId) {
 
 function openNewTicketModal(preselectedSensorId) {
     const select = document.getElementById('ticket-sensor-input');
-    select.innerHTML = '<option value="">— Select Sensor —</option>' + sensors.sort((a, b) => a.id.localeCompare(b.id)).map(s => `<option value="${s.id}">${s.id}</option>`).join('');
+    select.innerHTML = '<option value="">— Select Sensor —</option>' + [...sensors].sort((a, b) => a.id.localeCompare(b.id)).map(s => `<option value="${s.id}">${s.id}</option>`).join('');
     if (preselectedSensorId) select.value = preselectedSensorId;
     document.getElementById('ticket-type-issue').checked = true;
     document.getElementById('ticket-type-calibration').checked = false;
@@ -4469,12 +4475,13 @@ async function saveNewAudit(event) {
     const scheduledEnd = document.getElementById('audit-end-input').value;
     const installTeam = document.getElementById('audit-install-team-input').value.trim();
     const takedownTeam = document.getElementById('audit-takedown-team-input').value.trim();
-    const notes = document.getElementById('audit-notes-input').value.trim();
+    const auditNotes = document.getElementById('audit-notes-input').value.trim();
     if (!auditPodId || !communityId || !communityPodId || !scheduledStart || !scheduledEnd) return;
+    if (new Date(scheduledEnd) < new Date(scheduledStart)) { alert('End date must be after start date.'); return; }
 
     const conductedBy = [installTeam, takedownTeam].filter(Boolean).join(' / ');
     const audit = { auditPodId, communityPodId, communityId, status: 'Scheduled', scheduledStart, scheduledEnd,
-        actualStart: null, actualEnd: null, conductedBy, notes, analysisResults: {},
+        actualStart: null, actualEnd: null, conductedBy, notes: auditNotes, analysisResults: {},
         createdBy: getCurrentUserName(), createdById: currentUserId };
     try { const saved = await db.insertAudit(audit); audits.unshift(saved); }
     catch (err) { handleSaveError(err); audit.id = generateId('aud'); audits.unshift(audit); }
@@ -4512,7 +4519,7 @@ function openAuditDetail(auditId) {
             <button class="btn" onclick="closeModal('modal-audit-detail')">Done</button>
             ${nextStatus ? `<button class="btn btn-primary" onclick="advanceAuditStatus('${audit.id}')">Advance to: ${nextStatus}</button>` : ''}
             ${idx > 0 && isEditable ? `<a class="undo-link" onclick="revertAuditStatus('${audit.id}')">undo last advance</a>` : ''}
-            ${audit.status === 'Complete' || audit.status === 'Analysis Pending' ? `<button class="btn" onclick="beginAnalysis('${audit.id}')" style="border-color:var(--navy-500);color:var(--navy-500)">Begin Analysis</button>` : ''}
+            ${audit.status === 'Complete' || audit.status === 'Analysis Pending' || audit.status === 'Audit Complete' ? `<button class="btn" onclick="beginAnalysis('${audit.id}')" style="border-color:var(--navy-500);color:var(--navy-500)">${Object.keys(audit.analysisResults || {}).length > 0 ? 'View Analysis' : 'Begin Analysis'}</button>` : ''}
         </div>
         <div class="ticket-detail-grid">
             <div class="ticket-field"><label>Community</label><p><a href="#" onclick="closeModal('modal-audit-detail'); showCommunity('${audit.communityId}'); return false;" style="color:var(--navy-500)">${escapeHtml(communityName)}</a></p></div>
@@ -4641,8 +4648,1145 @@ function revertAuditStatus(auditId) {
     if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
 }
 
+// ===== AUDIT ANALYSIS ENGINE =====
+let analysisChartInstances = [];
+let analysisDataCache = {}; // keyed by auditId — raw parsed data, not persisted
+
+const DQO_THRESHOLDS = {
+    r2: { min: 0.70, label: 'R\u00B2 \u2265 0.70' },
+    slope: { min: 0.65, max: 1.35, label: 'Slope: 1.0 \u00B1 0.35' },
+    intercept: { min: -5, max: 5, label: '-5 \u2264 Intercept \u2264 5' },
+    sd: { max: 5, label: 'SD \u2264 5' },
+    rmse: { max: 7, label: 'RMSE \u2264 7' },
+};
+
+// Column name mapping: match QuantAQ AirVision export columns to our parameter keys
+const PARAM_COLUMN_MAP = {
+    co: [/\bCO_PPB\b/i, /\bco_ppb\b/i, /\bCO\b.*ppb/i],
+    no: [/\bNO_PPB\b/i, /\bno_ppb\b/i, /(?<![A-Z])NO\b.*ppb/i],
+    no2: [/\bNO2_PPB\b/i, /\bno2_ppb\b/i, /\bNO\u2082\b/i],
+    o3: [/\bOZONE_PPB\b/i, /\bo3_ppb\b/i, /\bO3\b.*ppb/i, /\bozone\b/i],
+    pm10: [/\bPM10_CONTIN\b/i, /\bpm10\b/i, /\bPM\s*10\b/i],
+    pm25: [/\bPM25\b/i, /\bpm2\.?5\b/i, /\bPM\s*2\.?5\b/i],
+};
+
 function beginAnalysis(auditId) {
-    alert('Analysis upload coming soon. Upload an Excel file with collocation data for PM\u2082.\u2085, PM\u2081\u2080, CO, NO, NO\u2082, and O\u2083. DQO thresholds will be applied automatically.');
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) return;
+    const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || audit.communityId;
+
+    const hasResults = Object.keys(audit.analysisResults || {}).length > 0;
+
+    // If we have both results and cached data, show full analysis
+    if (hasResults && analysisDataCache[auditId]) {
+        document.getElementById('analysis-modal-title').textContent = audit.analysisName || `Audit Analysis: ${communityName}`;
+        renderAnalysisResults(auditId, analysisDataCache[auditId]);
+        openModal('modal-audit-analysis');
+        return;
+    }
+
+    // If we have results but no cached data (page was refreshed), show DQO summary + re-upload option
+    if (hasResults && !analysisDataCache[auditId]) {
+        document.getElementById('analysis-modal-title').textContent = audit.analysisName || `Audit Analysis: ${communityName}`;
+        renderSavedAnalysisView(auditId);
+        openModal('modal-audit-analysis');
+        return;
+    }
+
+    // Show upload flow
+    const defaultName = `Audit ${audit.auditPodId} \u2014 ${communityName} ${audit.communityPodId}, ${audit.scheduledStart || ''} to ${audit.scheduledEnd || ''}`;
+    document.getElementById('analysis-modal-title').textContent = 'New Audit Analysis';
+
+    document.getElementById('audit-analysis-body').innerHTML = `
+        <div class="analysis-instructions">
+            <strong>Data Preparation Instructions:</strong>
+            <ol>
+                <li>Pull data from the audit pod and local pod from AirVision</li>
+                <li>Open the file and clean up: remove invalidated data</li>
+                <li>Trim start and end of dataset to the start and end of the audit period</li>
+                <li><strong>Do not remove the first 24 hours</strong> \u2014 the app will automatically exclude them from regression analysis</li>
+            </ol>
+        </div>
+        <label style="font-size:12px;font-weight:600;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.5px">Analysis Name</label>
+        <input type="text" class="analysis-name-input" id="analysis-name-input" value="${escapeHtml(defaultName)}" placeholder="e.g. Audit 471 - Kodiak 660, March 4-13 2026">
+        <label class="analysis-upload-zone" id="analysis-drop-zone">
+            <div class="analysis-upload-icon">&#128196;</div>
+            <div class="analysis-upload-text">Click to upload Excel file (.xls or .xlsx)</div>
+            <div class="analysis-upload-hint">Hourly data export from AirVision with both sensor columns</div>
+            <input type="file" accept=".xls,.xlsx" onchange="handleAnalysisUpload('${auditId}', this.files[0])">
+        </label>
+    `;
+    openModal('modal-audit-analysis');
+}
+
+function closeAnalysisModal() {
+    // Destroy any active charts to free memory
+    analysisChartInstances.forEach(c => { try { c.destroy(); } catch(e) {} });
+    analysisChartInstances = [];
+    closeModal('modal-audit-analysis');
+}
+
+function handleAnalysisUpload(auditId, file) {
+    if (!file) return;
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) return;
+
+    // Capture the analysis name before we replace the DOM
+    const analysisName = document.querySelector('#analysis-name-input')?.value || `Audit ${audit.auditPodId} - ${audit.communityPodId}`;
+
+    const body = document.getElementById('audit-analysis-body');
+    body.innerHTML = '<div class="analysis-processing">Processing data... parsing Excel file and running regression analysis.</div>';
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            // Use first sheet (or "Sheet1" or "Hour Data")
+            const sheetName = wb.SheetNames.find(n => /hour|data|sheet1/i.test(n)) || wb.SheetNames[0];
+            const sheet = wb.Sheets[sheetName];
+            const jsonRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+            const parsed = parseAuditData(jsonRows, audit);
+            if (!parsed) {
+                body.innerHTML = '<div class="analysis-processing" style="color:var(--aurora-rose)">Could not parse the uploaded file. Make sure it contains hourly data for two sensors with parameter columns (CO, NO, NO\u2082, O\u2083, PM\u2081\u2080, PM\u2082.\u2085).</div>';
+                return;
+            }
+
+            // Run regression on trimmed data (excluding first 24 hours)
+            const results = runAllAnalyses(parsed);
+
+            // Save — strip pairs arrays (too large for persistence)
+            audit.analysisResults = {};
+            AUDIT_PARAMETERS.forEach(p => {
+                if (results[p.key]) {
+                    const { pairs, ...summary } = results[p.key];
+                    audit.analysisResults[p.key] = summary;
+                }
+            });
+            audit.analysisName = analysisName;
+            audit.analysisUploadDate = new Date().toISOString();
+            audit.analysisUploadedBy = getCurrentUserName();
+            persistAuditUpdate(auditId, {
+                analysisResults: audit.analysisResults,
+                analysisName: audit.analysisName,
+                analysisUploadDate: audit.analysisUploadDate,
+                analysisUploadedBy: audit.analysisUploadedBy,
+            });
+
+            // Cache raw data (includes pairs for charting)
+            analysisDataCache[auditId] = parsed;
+            // Also store full results with pairs in cache for scatter plots
+            analysisDataCache[auditId].regressionResults = results;
+
+            // Advance status based on DQO results
+            const allPass = AUDIT_PARAMETERS.every(p => audit.analysisResults[p.key]?.pass);
+            if (audit.status === 'Complete' || audit.status === 'Analysis Pending') {
+                const oldStatus = audit.status;
+                const newStatus = allPass ? 'Audit Complete' : 'Analysis Pending';
+                audit.status = newStatus;
+                persistAuditUpdate(auditId, { status: newStatus });
+
+                if (allPass) {
+                    // Update sensor statuses (same as advanceAuditStatus)
+                    const auditStatusPrefix = 'Audit: ';
+                    const communityPod = sensors.find(x => x.id === audit.communityPodId);
+                    const auditPod = sensors.find(x => x.id === audit.auditPodId);
+                    if (communityPod) {
+                        communityPod.status = getStatusArray(communityPod).filter(st => !st.startsWith(auditStatusPrefix));
+                        if (communityPod.status.length === 0) communityPod.status = ['Online'];
+                        persistSensor(communityPod);
+                    }
+                    if (auditPod) {
+                        auditPod.status = getStatusArray(auditPod).filter(st => st !== 'Auditing a Community');
+                        if (auditPod.status.length === 0) auditPod.status = ['Online'];
+                        persistSensor(auditPod);
+                    }
+                    buildSensorSidebar();
+                }
+
+                const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || '';
+                const dqoNote = allPass
+                    ? `Audit analysis complete: all parameters pass DQO. "${oldStatus}" \u2192 "Audit Complete" for ${communityName}.`
+                    : `Audit analysis uploaded for ${communityName}: one or more parameters fail DQO. Review required.`;
+                createNote('Audit', dqoNote, {
+                    sensors: [audit.auditPodId, audit.communityPodId], communities: [audit.communityId] });
+                updateSidebarAuditCount();
+            }
+
+            // Render
+            document.getElementById('analysis-modal-title').textContent = analysisName;
+            renderAnalysisResults(auditId, parsed);
+
+            // Update audit detail if open
+            if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
+        } catch (err) {
+            console.error('Analysis error:', err);
+            body.innerHTML = `<div class="analysis-processing" style="color:var(--aurora-rose)">Error processing file: ${escapeHtml(err.message)}</div>`;
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function parseAuditData(rows, audit) {
+    if (!rows || rows.length < 10) return null;
+
+    // Row 0 or 1 = headers. Find the header row (row with text like "AMBTEMP", "CO", etc.)
+    let headerRowIdx = 0;
+    for (let i = 0; i < Math.min(5, rows.length); i++) {
+        const rowStr = rows[i].join(' ').toUpperCase();
+        if ((rowStr.includes('CO_PPB') || rowStr.includes('PM25') || rowStr.includes('PM10') || rowStr.includes('AMBTEMP') || rowStr.includes('OZONE')) && rowStr.includes('MOD')) {
+            headerRowIdx = i;
+            break;
+        }
+    }
+
+    const headers = rows[headerRowIdx].map(h => String(h).trim());
+
+    // Find the two sensor IDs from column headers
+    // Pattern: "Quant_MOD00471 CO_PPB 001h" or "MOD-00471_co" etc.
+    const sensorIds = new Set();
+    const sensorPattern = /(?:Quant_)?(MOD[-_]*\d{3,6})/i;
+    headers.forEach(h => {
+        const m = h.match(sensorPattern);
+        if (m) sensorIds.add(m[1].replace(/[-_]/g, '').toUpperCase());
+    });
+
+    if (sensorIds.size < 2) return null;
+    const sensorList = [...sensorIds];
+
+    // Determine which is sensor A (audit pod) and B (community pod)
+    const auditPodNorm = audit.auditPodId.replace(/[-_\s]/g, '').toUpperCase();
+    const communityPodNorm = audit.communityPodId.replace(/[-_\s]/g, '').toUpperCase();
+
+    let sensorA = null, sensorB = null;
+    for (const sid of sensorList) {
+        if (sid.includes(auditPodNorm.replace('MOD', '')) || auditPodNorm.includes(sid.replace('MOD', ''))) sensorA = sid;
+        else if (sid.includes(communityPodNorm.replace('MOD', '')) || communityPodNorm.includes(sid.replace('MOD', ''))) sensorB = sid;
+    }
+    // Fallback: just assign in order
+    if (!sensorA) sensorA = sensorList[0];
+    if (!sensorB) sensorB = sensorList[1];
+
+    // Map columns to parameters for each sensor
+    function findParamCols(sensorNorm) {
+        const cols = {};
+        headers.forEach((h, idx) => {
+            const hNorm = h.replace(/[-_]/g, '').toUpperCase();
+            if (!hNorm.includes(sensorNorm.replace('MOD', '')) && !hNorm.includes(sensorNorm)) return;
+            for (const [paramKey, patterns] of Object.entries(PARAM_COLUMN_MAP)) {
+                for (const pat of patterns) {
+                    if (pat.test(h)) { cols[paramKey] = idx; break; }
+                }
+            }
+        });
+        return cols;
+    }
+
+    const colsA = findParamCols(sensorA);
+    const colsB = findParamCols(sensorB);
+
+    // Skip sub-header rows (like "Final Value")
+    let dataStart = headerRowIdx + 1;
+    for (let i = dataStart; i < Math.min(dataStart + 3, rows.length); i++) {
+        const firstVal = String(rows[i][0] || '').toLowerCase();
+        if (firstVal.includes('final') || firstVal.includes('value') || firstVal.includes('unit') || firstVal === '') {
+            dataStart = i + 1;
+        } else {
+            break;
+        }
+    }
+
+    // Parse timestamps and data
+    const allRows = [];
+    for (let i = dataStart; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length < 2) continue;
+        const tsRaw = row[0];
+        if (tsRaw === '' || tsRaw === null || tsRaw === undefined) continue;
+
+        // Parse timestamp - could be Excel serial number or date string
+        let ts;
+        const numVal = Number(tsRaw);
+        if (!isNaN(numVal) && numVal > 40000 && numVal < 60000) {
+            // Excel serial date to JS date
+            ts = new Date((numVal - 25569) * 86400 * 1000);
+        } else {
+            ts = new Date(tsRaw);
+        }
+        if (isNaN(ts.getTime())) continue;
+
+        const entry = { timestamp: ts, tsRaw: numVal || tsRaw, values: {} };
+        for (const paramKey of Object.keys(PARAM_COLUMN_MAP)) {
+            const vA = colsA[paramKey] !== undefined ? parseFloat(row[colsA[paramKey]]) : NaN;
+            const vB = colsB[paramKey] !== undefined ? parseFloat(row[colsB[paramKey]]) : NaN;
+            entry.values[paramKey] = { a: vA, b: vB };
+        }
+        allRows.push(entry);
+    }
+
+    if (allRows.length < 5) return null;
+
+    // Sort by timestamp
+    allRows.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Find the 24-hour trim point
+    const firstTs = allRows[0].timestamp.getTime();
+    const trimCutoff = firstTs + 24 * 60 * 60 * 1000;
+    const trimIndex = allRows.findIndex(r => r.timestamp.getTime() >= trimCutoff);
+
+    // Build descriptive labels: "Ninilchik Community Pod MOD-00660"
+    const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || audit.communityId;
+    const auditPodSensor = sensors.find(s => s.id === audit.auditPodId);
+    const communityPodSensor = sensors.find(s => s.id === audit.communityPodId);
+    const auditPodLocation = auditPodSensor?.community ? (COMMUNITIES.find(c => c.id === auditPodSensor.community)?.name || '') : '';
+    const labelA = `${auditPodLocation ? auditPodLocation + ' ' : ''}${auditPodSensor?.type || 'Audit Pod'} ${audit.auditPodId}`.trim();
+    const labelB = `${communityName} ${communityPodSensor?.type || 'Community Pod'} ${audit.communityPodId}`.trim();
+
+    return {
+        sensorA: { id: sensorA, label: labelA },
+        sensorB: { id: sensorB, label: labelB },
+        allRows,
+        trimIndex: trimIndex >= 0 ? trimIndex : 0,
+        trimmedRows: trimIndex >= 0 ? allRows.slice(trimIndex) : allRows,
+        headers,
+        colsA,
+        colsB,
+    };
+}
+
+function runLinearRegression(xArr, yArr) {
+    // Filter to only paired non-NaN values
+    const pairs = [];
+    for (let i = 0; i < xArr.length; i++) {
+        if (!isNaN(xArr[i]) && !isNaN(yArr[i]) && isFinite(xArr[i]) && isFinite(yArr[i])) {
+            pairs.push({ x: xArr[i], y: yArr[i] });
+        }
+    }
+    const n = pairs.length;
+    if (n < 3) return null;
+
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+    for (const p of pairs) {
+        sumX += p.x; sumY += p.y;
+        sumXY += p.x * p.y;
+        sumX2 += p.x * p.x;
+        sumY2 += p.y * p.y;
+    }
+
+    const denom = n * sumX2 - sumX * sumX;
+    if (denom === 0) return null;
+
+    const slope = (n * sumXY - sumX * sumY) / denom;
+    const intercept = (sumY - slope * sumX) / n;
+
+    // R-squared
+    const meanY = sumY / n;
+    let ssTot = 0, ssRes = 0;
+    const residuals = [];
+    for (const p of pairs) {
+        const predicted = slope * p.x + intercept;
+        const res = p.y - predicted;
+        residuals.push(res);
+        ssRes += res * res;
+        ssTot += (p.y - meanY) * (p.y - meanY);
+    }
+    const r2 = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
+
+    // SD of residuals
+    const meanRes = residuals.reduce((a, b) => a + b, 0) / n;
+    const sdRes = Math.sqrt(residuals.reduce((a, r) => a + (r - meanRes) * (r - meanRes), 0) / (n - 1));
+
+    // RMSE
+    const rmse = Math.sqrt(ssRes / n);
+
+    return {
+        slope: Math.round(slope * 10000) / 10000,
+        intercept: Math.round(intercept * 10000) / 10000,
+        r2: Math.round(r2 * 10000) / 10000,
+        sd: Math.round(sdRes * 10000) / 10000,
+        rmse: Math.round(rmse * 10000) / 10000,
+        n,
+        pairs,
+    };
+}
+
+function checkDQO(result) {
+    if (!result) return { r2: false, slope: false, intercept: false, sd: false, rmse: false, pass: false };
+    const dqo = {
+        r2: result.r2 >= DQO_THRESHOLDS.r2.min,
+        slope: result.slope >= DQO_THRESHOLDS.slope.min && result.slope <= DQO_THRESHOLDS.slope.max,
+        intercept: result.intercept >= DQO_THRESHOLDS.intercept.min && result.intercept <= DQO_THRESHOLDS.intercept.max,
+        sd: result.sd <= DQO_THRESHOLDS.sd.max,
+        rmse: result.rmse <= DQO_THRESHOLDS.rmse.max,
+    };
+    dqo.pass = dqo.r2 && dqo.slope && dqo.intercept && dqo.sd && dqo.rmse;
+    return dqo;
+}
+
+function runAllAnalyses(parsed) {
+    const results = {};
+    for (const param of AUDIT_PARAMETERS) {
+        const xArr = parsed.trimmedRows.map(r => r.values[param.key]?.a);
+        const yArr = parsed.trimmedRows.map(r => r.values[param.key]?.b);
+        const reg = runLinearRegression(xArr, yArr);
+        if (reg) {
+            const dqo = checkDQO(reg);
+            results[param.key] = { ...reg, dqo, pass: dqo.pass };
+        }
+    }
+    return results;
+}
+
+function renderAnalysisResults(auditId, parsed) {
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) return;
+    const results = audit.analysisResults || {};
+
+    // Destroy previous charts
+    analysisChartInstances.forEach(c => { try { c.destroy(); } catch(e) {} });
+    analysisChartInstances = [];
+
+    const trimCount = parsed.trimIndex;
+    const totalCount = parsed.allRows.length;
+    const analysisCount = parsed.trimmedRows.length;
+    const overallPass = AUDIT_PARAMETERS.every(p => results[p.key]?.pass);
+
+    const body = document.getElementById('audit-analysis-body');
+    body.innerHTML = `
+        <div style="margin-top:16px">
+            <span class="analysis-trim-note">First 24 hours excluded from DQO analysis (${trimCount} of ${totalCount} rows trimmed) \u2014 regression and DQO calculated on ${analysisCount} rows</span>
+            ${audit.analysisUploadDate ? `<span style="float:right;font-size:11px;color:var(--slate-400)">Uploaded ${new Date(audit.analysisUploadDate).toLocaleDateString()} by ${escapeHtml(audit.analysisUploadedBy || '')}</span>` : ''}
+        </div>
+        <div class="analysis-tabs">
+            <button class="analysis-tab active" onclick="switchAnalysisTab(this, 'analysis')">Analysis</button>
+            <button class="analysis-tab" onclick="switchAnalysisTab(this, 'rawdata')">Raw Data</button>
+        </div>
+        <div id="analysis-panel-analysis" class="analysis-tab-panel active">
+            <div id="analysis-section-dqo"></div>
+            <div id="analysis-section-timeseries" style="margin-top:28px"></div>
+            <div id="analysis-section-scatter" style="margin-top:28px"></div>
+        </div>
+        <div id="analysis-panel-rawdata" class="analysis-tab-panel"></div>
+        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+            <button class="btn btn-primary" onclick="generateAuditReport('${auditId}')">Generate Report</button>
+            <button class="btn" onclick="rerunAnalysisUpload('${auditId}')">Re-upload Data</button>
+        </div>
+    `;
+
+    // DQO Summary — inline at top
+    renderDQOSection(results, overallPass);
+
+    // Time Series — below DQO
+    renderTimeSeriesSection(auditId, parsed);
+
+    // Scatter/Regression Plots — below time series (use cached full results with pairs data for charts)
+    const chartResults = parsed.regressionResults || results;
+    renderScatterSection(auditId, parsed, chartResults);
+
+    // Raw Data — separate tab
+    renderRawDataPanel(parsed);
+}
+
+function switchAnalysisTab(btn, panelKey) {
+    btn.closest('.analysis-tabs').querySelectorAll('.analysis-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    const container = document.getElementById('audit-analysis-body');
+    container.querySelectorAll('.analysis-tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('analysis-panel-' + panelKey).classList.add('active');
+}
+
+function rerunAnalysisUpload(auditId) {
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) return;
+    // Clear cache first so beginAnalysis doesn't re-render full results
+    delete analysisDataCache[auditId];
+    // Destroy any active charts
+    analysisChartInstances.forEach(c => { try { c.destroy(); } catch(e) {} });
+    analysisChartInstances = [];
+    const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || audit.communityId;
+    const defaultName = audit.analysisName || `Audit ${audit.auditPodId} \u2014 ${communityName} ${audit.communityPodId}`;
+    document.getElementById('analysis-modal-title').textContent = 'Re-upload Audit Data';
+    document.getElementById('audit-analysis-body').innerHTML = `
+        <div class="analysis-instructions">
+            <strong>Data Preparation Instructions:</strong>
+            <ol>
+                <li>Pull data from the audit pod and local pod from AirVision</li>
+                <li>Open the file and clean up: remove invalidated data</li>
+                <li>Trim start and end of dataset to the start and end of the audit period</li>
+                <li><strong>Do not remove the first 24 hours</strong> \u2014 the app will automatically exclude them from regression analysis</li>
+            </ol>
+        </div>
+        <label style="font-size:12px;font-weight:600;color:var(--slate-500);text-transform:uppercase;letter-spacing:0.5px">Analysis Name</label>
+        <input type="text" class="analysis-name-input" id="analysis-name-input" value="${escapeHtml(defaultName)}">
+        <label class="analysis-upload-zone" id="analysis-drop-zone">
+            <div class="analysis-upload-icon">&#128196;</div>
+            <div class="analysis-upload-text">Click to upload Excel file (.xls or .xlsx)</div>
+            <div class="analysis-upload-hint">This will replace the existing analysis results</div>
+            <input type="file" accept=".xls,.xlsx" onchange="handleAnalysisUpload('${auditId}', this.files[0])">
+        </label>
+    `;
+}
+
+function renderSavedAnalysisView(auditId) {
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) return;
+    const results = audit.analysisResults || {};
+    const overallPass = AUDIT_PARAMETERS.every(p => results[p.key]?.pass);
+    const thresholdNote = Object.values(DQO_THRESHOLDS).map(t => t.label).join(' &nbsp;\u00B7&nbsp; ');
+
+    const body = document.getElementById('audit-analysis-body');
+    body.innerHTML = `
+        <div style="margin-top:16px">
+            ${audit.analysisUploadDate ? `<span style="font-size:11px;color:var(--slate-400)">Uploaded ${new Date(audit.analysisUploadDate).toLocaleDateString()} by ${escapeHtml(audit.analysisUploadedBy || '')}</span>` : ''}
+        </div>
+        <div class="dqo-overall ${overallPass ? 'pass' : 'fail'}" style="margin-top:12px">
+            ${overallPass ? 'ALL PARAMETERS PASS DATA QUALITY OBJECTIVES' : 'ONE OR MORE PARAMETERS FAIL DATA QUALITY OBJECTIVES'}
+        </div>
+        <div style="overflow-x:auto;margin-top:16px">
+        <table class="dqo-summary-table">
+            <thead><tr>
+                <th>Parameter</th><th>R\u00B2</th><th>Slope</th><th>Intercept</th><th>SD</th><th>RMSE</th><th>n</th><th>Result</th>
+            </tr></thead>
+            <tbody>
+                ${AUDIT_PARAMETERS.map(p => {
+                    const r = results[p.key];
+                    if (!r) return `<tr><td>${p.label} (${p.unit})</td><td colspan="7" style="color:var(--slate-400);font-family:var(--font-sans)">No data</td></tr>`;
+                    const d = r.dqo || {};
+                    const cls = (pass) => pass ? 'dqo-cell-pass' : 'dqo-cell-fail';
+                    return `<tr>
+                        <td>${p.label} (${p.unit})</td>
+                        <td class="${cls(d.r2)}">${r.r2}</td>
+                        <td class="${cls(d.slope)}">${r.slope}</td>
+                        <td class="${cls(d.intercept)}">${r.intercept}</td>
+                        <td class="${cls(d.sd)}">${r.sd}</td>
+                        <td class="${cls(d.rmse)}">${r.rmse}</td>
+                        <td style="color:var(--slate-400)">${r.n}</td>
+                        <td>${r.pass ? '<span class="dqo-pass">PASS</span>' : '<span class="dqo-fail">FAIL</span>'}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>
+        </div>
+        <div class="analysis-dqo-thresholds"><strong>Data Quality Objectives (DQO) Thresholds:</strong> ${thresholdNote}<br><span style="font-size:10px">Intercept, SD, and RMSE are expressed in the units of the measured parameter (ppb for gases, \u00B5g/m\u00B3 for particulate matter).</span></div>
+        <p style="font-size:13px;color:var(--slate-400);margin-top:16px">To view scatter plots, time series, and raw data, re-upload the original Excel file.</p>
+        <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+            <button class="btn btn-primary" onclick="generateAuditReport('${auditId}')">Generate Report</button>
+            <button class="btn" onclick="rerunAnalysisUpload('${auditId}')">Re-upload Data for Charts</button>
+        </div>
+    `;
+}
+
+function renderDQOSection(results, overallPass) {
+    const el = document.getElementById('analysis-section-dqo');
+    const thresholdNote = Object.values(DQO_THRESHOLDS).map(t => t.label).join(' &nbsp;\u00B7&nbsp; ');
+
+    el.innerHTML = `
+        <div class="dqo-overall ${overallPass ? 'pass' : 'fail'}">
+            ${overallPass ? 'ALL PARAMETERS PASS DATA QUALITY OBJECTIVES' : 'ONE OR MORE PARAMETERS FAIL DATA QUALITY OBJECTIVES'}
+        </div>
+        <div style="overflow-x:auto;margin-top:16px">
+        <table class="dqo-summary-table">
+            <thead><tr>
+                <th>Parameter</th><th>R\u00B2</th><th>Slope</th><th>Intercept</th><th>SD</th><th>RMSE</th><th>n</th><th>Result</th>
+            </tr></thead>
+            <tbody>
+                ${AUDIT_PARAMETERS.map(p => {
+                    const r = results[p.key];
+                    if (!r) return `<tr><td>${p.label} (${p.unit})</td><td colspan="7" style="color:var(--slate-400);font-family:var(--font-sans)">No data</td></tr>`;
+                    const d = r.dqo || {};
+                    const cls = (pass) => pass ? 'dqo-cell-pass' : 'dqo-cell-fail';
+                    return `<tr>
+                        <td>${p.label} (${p.unit})</td>
+                        <td class="${cls(d.r2)}">${r.r2}</td>
+                        <td class="${cls(d.slope)}">${r.slope}</td>
+                        <td class="${cls(d.intercept)}">${r.intercept}</td>
+                        <td class="${cls(d.sd)}">${r.sd}</td>
+                        <td class="${cls(d.rmse)}">${r.rmse}</td>
+                        <td style="color:var(--slate-400)">${r.n}</td>
+                        <td>${r.pass ? '<span class="dqo-pass">PASS</span>' : '<span class="dqo-fail">FAIL</span>'}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>
+        </div>
+        <div class="analysis-dqo-thresholds"><strong>Data Quality Objectives (DQO) Thresholds:</strong> ${thresholdNote}<br><span style="font-size:10px">Intercept, SD, and RMSE are expressed in the units of the measured parameter (ppb for gases, \u00B5g/m\u00B3 for particulate matter).</span></div>
+    `;
+}
+
+function renderScatterSection(auditId, parsed, results) {
+    const el = document.getElementById('analysis-section-scatter');
+    el.innerHTML = `
+        <h3 class="analysis-section-heading">Regression Plots</h3>
+        <div class="analysis-chart-grid">
+        ${AUDIT_PARAMETERS.map(p => `<div class="analysis-chart-card">
+            <h4>${p.label} (${p.unit}) \u2014 ${parsed.sensorA.label} vs ${parsed.sensorB.label}</h4>
+            <canvas id="scatter-${auditId}-${p.key}"></canvas>
+        </div>`).join('')}
+    </div>`;
+
+    // Defer chart creation to next frame so canvas elements exist
+    requestAnimationFrame(() => {
+        AUDIT_PARAMETERS.forEach(p => {
+            const r = results[p.key];
+            if (!r || !r.pairs) return;
+            createScatterChart(`scatter-${auditId}-${p.key}`, r, p, parsed);
+        });
+    });
+}
+
+function createScatterChart(canvasId, regression, param, parsed) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const xVals = regression.pairs.map(p => p.x);
+    const yVals = regression.pairs.map(p => p.y);
+    const allVals = [...xVals, ...yVals];
+    const minVal = Math.min(...allVals);
+    const maxVal = Math.max(...allVals);
+    const minX = Math.min(...xVals);
+    const maxX = Math.max(...xVals);
+    const regLinePoints = [
+        { x: minX, y: regression.slope * minX + regression.intercept },
+        { x: maxX, y: regression.slope * maxX + regression.intercept },
+    ];
+    // 1:1 reference line (y = x)
+    const oneToOnePoints = [
+        { x: minVal, y: minVal },
+        { x: maxVal, y: maxVal },
+    ];
+
+    const chart = new Chart(canvas, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: `${param.label} data`,
+                    data: regression.pairs,
+                    backgroundColor: 'rgba(27,42,74,0.45)',
+                    borderColor: 'rgba(27,42,74,0.6)',
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                },
+                {
+                    label: `y = ${regression.slope}x ${regression.intercept >= 0 ? '+' : '\u2212'} ${Math.abs(regression.intercept)}`,
+                    data: regLinePoints,
+                    type: 'line',
+                    borderColor: '#C9A84C',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false,
+                },
+                {
+                    label: '1:1 line',
+                    data: oneToOnePoints,
+                    type: 'line',
+                    borderColor: 'rgba(150,150,150,0.5)',
+                    borderWidth: 1.5,
+                    borderDash: [6, 4],
+                    pointRadius: 0,
+                    fill: false,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'bottom', labels: { font: { size: 11 }, boxWidth: 14 } },
+                title: {
+                    display: true,
+                    text: `R\u00B2=${regression.r2}  Slope=${regression.slope}  Intercept=${regression.intercept}`,
+                    font: { size: 12, family: "'JetBrains Mono', monospace" },
+                    color: '#64748b',
+                },
+            },
+            scales: {
+                x: { min: minVal, max: maxVal, title: { display: true, text: `${parsed.sensorA.label} (${param.unit})`, font: { size: 11 } }, grid: { color: '#d1d5db' } },
+                y: { min: minVal, max: maxVal, title: { display: true, text: `${parsed.sensorB.label} (${param.unit})`, font: { size: 11 } }, grid: { color: '#d1d5db' } },
+            },
+        },
+    });
+    analysisChartInstances.push(chart);
+}
+
+function renderTimeSeriesSection(auditId, parsed) {
+    const el = document.getElementById('analysis-section-timeseries');
+    el.innerHTML = `
+        <h3 class="analysis-section-heading">Time Series</h3>
+        <span class="analysis-trim-note">Shaded region = first 24 hours (excluded from regression)</span>
+        <div class="analysis-chart-grid">
+        ${AUDIT_PARAMETERS.map(p => `<div class="analysis-chart-card">
+            <h4>${p.label} (${p.unit})</h4>
+            <canvas id="ts-${auditId}-${p.key}"></canvas>
+        </div>`).join('')}
+    </div>`;
+
+    requestAnimationFrame(() => {
+        AUDIT_PARAMETERS.forEach(p => {
+            createTimeSeriesChart(`ts-${auditId}-${p.key}`, parsed, p);
+        });
+    });
+}
+
+function createTimeSeriesChart(canvasId, parsed, param) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const labels = parsed.allRows.map(r => r.timestamp);
+    const seriesA = parsed.allRows.map(r => {
+        const v = r.values[param.key]?.a;
+        return isNaN(v) ? null : v;
+    });
+    const seriesB = parsed.allRows.map(r => {
+        const v = r.values[param.key]?.b;
+        return isNaN(v) ? null : v;
+    });
+
+    // Trim boundary annotation
+    const trimTs = parsed.trimIndex > 0 ? parsed.allRows[parsed.trimIndex].timestamp : null;
+
+    const datasets = [
+        {
+            label: parsed.sensorA.label,
+            data: seriesA,
+            borderColor: '#1B2A4A',
+            backgroundColor: 'rgba(27,42,74,0.1)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.2,
+            fill: false,
+        },
+        {
+            label: parsed.sensorB.label,
+            data: seriesB,
+            borderColor: '#C9A84C',
+            backgroundColor: 'rgba(201,168,76,0.1)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.2,
+            fill: false,
+        },
+    ];
+
+    const chart = new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
+                annotation: trimTs ? {
+                    annotations: {
+                        trimBox: {
+                            type: 'box',
+                            xMin: labels[0],
+                            xMax: trimTs,
+                            backgroundColor: 'rgba(255,248,232,0.5)',
+                            borderColor: 'rgba(201,168,76,0.3)',
+                        }
+                    }
+                } : undefined,
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'day', displayFormats: { day: 'MMM d', hour: 'MMM d HH:mm' } },
+                    grid: { color: '#d1d5db' },
+                    title: { display: false },
+                },
+                y: {
+                    title: { display: true, text: param.unit, font: { size: 11 } },
+                    grid: { color: '#d1d5db' },
+                },
+            },
+            interaction: { mode: 'index', intersect: false },
+        },
+    });
+    analysisChartInstances.push(chart);
+}
+
+function renderRawDataPanel(parsed) {
+    const panel = document.getElementById('analysis-panel-rawdata');
+    const paramKeys = Object.keys(PARAM_COLUMN_MAP);
+    const paramLabels = AUDIT_PARAMETERS.reduce((m, p) => { m[p.key] = `${p.label} (${p.unit})`; return m; }, {});
+
+    let tableHtml = `<div class="analysis-raw-wrap"><table class="analysis-raw-table"><thead><tr>
+        <th>Date/Time</th>
+        ${paramKeys.map(k => `<th>${parsed.sensorA.label}<br>${paramLabels[k] || k}</th><th>${parsed.sensorB.label}<br>${paramLabels[k] || k}</th>`).join('')}
+    </tr></thead><tbody>`;
+
+    const maxRows = Math.min(parsed.allRows.length, 500);
+    for (let i = 0; i < maxRows; i++) {
+        const r = parsed.allRows[i];
+        const isTrimmed = i < parsed.trimIndex;
+        const dateStr = r.timestamp.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+        tableHtml += `<tr class="${isTrimmed ? 'trimmed-row' : ''}">
+            <td>${dateStr}${isTrimmed ? ' *' : ''}</td>
+            ${paramKeys.map(k => {
+                const va = r.values[k]?.a;
+                const vb = r.values[k]?.b;
+                return `<td>${isNaN(va) ? '—' : va}</td><td>${isNaN(vb) ? '—' : vb}</td>`;
+            }).join('')}
+        </tr>`;
+    }
+    tableHtml += '</tbody></table></div>';
+
+    if (parsed.allRows.length > 500) {
+        tableHtml += `<p style="font-size:12px;color:var(--slate-400);margin-top:8px">Showing first 500 of ${parsed.allRows.length} rows.</p>`;
+    }
+
+    panel.innerHTML = `
+        <span class="analysis-trim-note">* Faded rows = first 24 hours (excluded from regression)</span>
+        ${tableHtml}
+    `;
+}
+
+// ===== AUDIT LISTS IN COMMUNITY / SENSOR VIEWS =====
+function renderCommunityAudits(communityId) {
+    const section = document.getElementById('community-audits-section');
+    if (!section) return;
+
+    const communityAudits = audits.filter(a => a.communityId === communityId);
+    if (communityAudits.length === 0) {
+        section.innerHTML = `<div class="empty-state">No audits for this community yet.
+            <br><button class="btn btn-primary" style="margin-top:12px" onclick="openNewAuditModal('${communityId}')">Schedule Audit</button></div>`;
+        return;
+    }
+
+    section.innerHTML = communityAudits.map(a => renderAuditListCard(a, 'community')).join('');
+}
+
+function renderSensorAudits(sensorId) {
+    const section = document.getElementById('sensor-audits-section');
+    if (!section) return;
+
+    const sensorAudits = audits.filter(a => a.auditPodId === sensorId || a.communityPodId === sensorId);
+    if (sensorAudits.length === 0) {
+        section.innerHTML = '<div class="empty-state">No audits involving this sensor.</div>';
+        return;
+    }
+
+    section.innerHTML = sensorAudits.map(a => {
+        const role = a.auditPodId === sensorId ? 'Audit Pod' : 'Community Pod';
+        return renderAuditListCard(a, 'sensor', role);
+    }).join('');
+}
+
+function renderAuditListCard(audit, context, sensorRole) {
+    const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || audit.communityId;
+    const dateRange = audit.scheduledStart ? `${new Date(audit.scheduledStart + 'T00:00').toLocaleDateString()} \u2013 ${new Date(audit.scheduledEnd + 'T00:00').toLocaleDateString()}` : '\u2014';
+    const hasResults = Object.keys(audit.analysisResults || {}).length > 0;
+
+    let paramBadges = '';
+    if (hasResults) {
+        paramBadges = AUDIT_PARAMETERS.map(p => {
+            const r = audit.analysisResults[p.key];
+            if (!r) return `<span class="audit-param-badge pending">${p.label}</span>`;
+            return `<span class="audit-param-badge ${r.pass ? 'pass' : 'fail'}">${p.label} ${r.pass ? '\u2713' : '\u2717'}</span>`;
+        }).join('');
+    }
+
+    return `<div class="audit-list-card" onclick="openAuditDetail('${audit.id}')">
+        <div class="audit-list-card-header">
+            <span style="font-weight:600;color:var(--slate-700)">${context === 'sensor' ? communityName : audit.analysisName || communityName}</span>
+            <span class="audit-status-badge ${AUDIT_STATUS_CSS[audit.status]}">${audit.status}</span>
+        </div>
+        <div class="audit-list-card-sensors">
+            ${audit.auditPodId} <span style="color:var(--slate-300)">\u2194</span> ${audit.communityPodId}
+            ${sensorRole ? `<span style="color:var(--slate-400);font-size:11px;margin-left:8px">(${sensorRole})</span>` : ''}
+        </div>
+        <div class="audit-list-card-meta">${dateRange}</div>
+        ${hasResults ? `<div class="audit-list-card-results">${paramBadges}</div>` : ''}
+        ${hasResults ? `<span class="analysis-view-btn" onclick="event.stopPropagation(); beginAnalysis('${audit.id}')">View Analysis \u2192</span>` : ''}
+    </div>`;
+}
+
+function generateAuditReport(auditId) {
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) return;
+    const results = audit.analysisResults || {};
+    const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || audit.communityId;
+    const overallPass = AUDIT_PARAMETERS.every(p => results[p.key]?.pass);
+    const thresholdNote = Object.values(DQO_THRESHOLDS).map(t => t.label).join('  \u00B7  ');
+    const cached = analysisDataCache[auditId];
+
+    // Build descriptive sensor labels
+    const auditPodSensor = sensors.find(s => s.id === audit.auditPodId);
+    const communityPodSensor = sensors.find(s => s.id === audit.communityPodId);
+    const auditPodLoc = auditPodSensor?.community ? (COMMUNITIES.find(c => c.id === auditPodSensor.community)?.name || '') : '';
+    const labelA = `${auditPodLoc ? auditPodLoc + ' ' : ''}${auditPodSensor?.type || 'Audit Pod'} ${audit.auditPodId}`.trim();
+    const labelB = `${communityName} ${communityPodSensor?.type || 'Community Pod'} ${audit.communityPodId}`.trim();
+
+    const dateRange = audit.scheduledStart
+        ? `${new Date(audit.scheduledStart + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} \u2013 ${new Date(audit.scheduledEnd + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+        : '\u2014';
+
+    // DQO table rows
+    const dqoRows = AUDIT_PARAMETERS.map(p => {
+        const r = results[p.key];
+        if (!r) return `<tr><td>${p.label} (${p.unit})</td><td colspan="7" style="color:#94a3b8">No data</td></tr>`;
+        const d = r.dqo || {};
+        const cls = (pass) => pass ? 'color:#1a7f37' : 'color:#c53030;font-weight:700';
+        return `<tr>
+            <td style="font-family:'DM Sans',sans-serif;font-weight:600">${p.label} (${p.unit})</td>
+            <td style="${cls(d.r2)}">${r.r2}</td>
+            <td style="${cls(d.slope)}">${r.slope}</td>
+            <td style="${cls(d.intercept)}">${r.intercept}</td>
+            <td style="${cls(d.sd)}">${r.sd}</td>
+            <td style="${cls(d.rmse)}">${r.rmse}</td>
+            <td style="color:#94a3b8">${r.n}</td>
+            <td style="text-align:center">${r.pass
+                ? '<span style="background:#e6f9ed;color:#1a7f37;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">PASS</span>'
+                : '<span style="background:#fde8e8;color:#c53030;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">FAIL</span>'}</td>
+        </tr>`;
+    }).join('');
+
+    // Data summary
+    const trimInfo = cached
+        ? `First 24 hours excluded from analysis (${cached.trimIndex} of ${cached.allRows.length} rows trimmed) \u2014 regression calculated on ${cached.trimmedRows.length} rows`
+        : `Analysis based on ${results[AUDIT_PARAMETERS[0]?.key]?.n || '\u2014'} valid hourly data pairs`;
+
+    // Raw data table (all rows for report — 14 days hourly = max ~336 rows)
+    let rawDataHtml = '';
+    if (cached) {
+        const paramKeys = Object.keys(PARAM_COLUMN_MAP);
+        const paramLabels = AUDIT_PARAMETERS.reduce((m, p) => { m[p.key] = `${p.label} (${p.unit})`; return m; }, {});
+        rawDataHtml = `
+            <div style="page-break-before:always"></div>
+            <h2 style="font-size:16px;color:#1B2A4A;margin:24px 0 12px;border-bottom:2px solid #1B2A4A;padding-bottom:6px">Hourly Data</h2>
+            <p style="font-size:11px;color:#8a6d20;background:#fff8e8;display:inline-block;padding:3px 10px;border-radius:6px;margin-bottom:8px">* = first 24 hours (excluded from regression)</p>
+            <table style="width:100%;border-collapse:collapse;font-size:9px;font-family:'JetBrains Mono',monospace">
+                <thead><tr style="background:#1B2A4A;color:white">
+                    <th style="padding:4px 6px;text-align:left">Date/Time</th>
+                    ${paramKeys.map(k => `<th style="padding:4px 6px">${labelA}<br>${paramLabels[k] || k}</th><th style="padding:4px 6px">${labelB}<br>${paramLabels[k] || k}</th>`).join('')}
+                </tr></thead>
+                <tbody>
+                    ${cached.allRows.map((r, i) => {
+                        const isTrimmed = i < cached.trimIndex;
+                        const dateStr = r.timestamp.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+                        return `<tr style="${isTrimmed ? 'opacity:0.4;background:#fff8e8' : (i % 2 === 0 ? '' : 'background:#fafbfc')}">
+                            <td style="padding:3px 6px;border-bottom:1px solid #d1d5db">${dateStr}${isTrimmed ? ' *' : ''}</td>
+                            ${paramKeys.map(k => {
+                                const va = r.values[k]?.a;
+                                const vb = r.values[k]?.b;
+                                return `<td style="padding:3px 6px;border-bottom:1px solid #d1d5db;text-align:right">${isNaN(va) ? '\u2014' : va}</td><td style="padding:3px 6px;border-bottom:1px solid #d1d5db;text-align:right">${isNaN(vb) ? '\u2014' : vb}</td>`;
+                            }).join('')}
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+            <p style="font-size:10px;color:#94a3b8;margin-top:4px">${cached.allRows.length} total hourly observations</p>
+        `;
+    }
+
+    // Open report in a new window
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) { alert('Please allow pop-ups to generate the report.'); return; }
+
+    reportWindow.document.write(`<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>Audit Report \u2014 ${escapeHtml(communityName)} ${escapeHtml(audit.auditPodId)} ${audit.scheduledStart || ''}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; color: #1e293b; padding: 40px 48px; max-width: 1000px; margin: 0 auto; line-height: 1.5; }
+    h1 { font-size: 22px; color: #1B2A4A; margin-bottom: 4px; }
+    h2 { font-size: 16px; color: #1B2A4A; margin: 28px 0 12px; border-bottom: 2px solid #1B2A4A; padding-bottom: 6px; }
+    .report-subtitle { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+    .report-header-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; border-bottom: 3px solid #C9A84C; padding-bottom: 16px; }
+    .report-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 32px; font-size: 13px; margin-bottom: 20px; }
+    .report-meta dt { font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .report-meta dd { margin: 0 0 8px; color: #1e293b; }
+    .report-meta dd .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .dqo-banner { padding: 12px 20px; border-radius: 10px; font-size: 15px; font-weight: 700; text-align: center; margin: 16px 0 20px; }
+    .dqo-banner.pass { background: #e6f9ed; color: #1a7f37; border: 1px solid #a3e4b8; }
+    .dqo-banner.fail { background: #fde8e8; color: #c53030; border: 1px solid #f5b3b3; }
+    .trim-note { display: inline-block; background: #fff8e8; color: #8a6d20; padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 12px; }
+    table.dqo { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
+    table.dqo th { text-align: right; padding: 10px 14px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+    table.dqo th:first-child { text-align: left; }
+    table.dqo th:last-child { text-align: center; }
+    table.dqo td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+    table.dqo td:last-child { text-align: center; }
+    table.dqo tbody tr:nth-child(even) { background: #fafbfc; }
+    .thresholds { font-size: 11px; color: #64748b; margin-top: 6px; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+    .chart-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; page-break-inside: avoid; }
+    .chart-card h4 { font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 8px; }
+    .chart-card canvas { width: 100% !important; height: 240px !important; }
+    .report-footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+    @media print {
+        body { padding: 20px; }
+        .no-print { display: none !important; }
+        .chart-card { break-inside: avoid; }
+        .dqo-banner, table.dqo tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+</style>
+</head><body>
+    <div class="no-print" style="margin-bottom:20px;text-align:right">
+        <button onclick="window.print()" style="padding:8px 20px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:600;background:#1B2A4A;color:white;border:none;border-radius:8px;cursor:pointer">Print / Save as PDF</button>
+    </div>
+
+    <div class="report-header-bar">
+        <div>
+            <h1>Sensor Collocation Audit Report</h1>
+            <div class="report-subtitle">${escapeHtml(communityName)} \u2014 ${dateRange}</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:#64748b">
+            <div>Alaska Department of Environmental Conservation</div>
+            <div>Air Quality Sensor Network</div>
+            <div style="margin-top:4px">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+        </div>
+    </div>
+
+    <h2>Audit Details</h2>
+    <dl class="report-meta">
+        <dt>Community</dt><dd>${escapeHtml(communityName)}</dd>
+        <dt>Audit Period</dt><dd>${dateRange}</dd>
+        <dt>Audit Pod (Reference)</dt><dd><span class="mono">${escapeHtml(labelA)}</span></dd>
+        <dt>Community Pod (Test)</dt><dd><span class="mono">${escapeHtml(labelB)}</span></dd>
+        <dt>Audit Pod Location</dt><dd>${escapeHtml(auditPodSensor?.location || communityPodSensor?.location || '\u2014')}</dd>
+        <dt>Community Pod Location</dt><dd>${escapeHtml(communityPodSensor?.location || '\u2014')}</dd>
+        <dt>Conducted By</dt><dd>${escapeHtml(audit.conductedBy || '\u2014')}</dd>
+        <dt>Analysis Uploaded</dt><dd>${audit.analysisUploadDate ? new Date(audit.analysisUploadDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '\u2014'}${audit.analysisUploadedBy ? ' by ' + escapeHtml(audit.analysisUploadedBy) : ''}</dd>
+        ${audit.notes ? `<dt>Notes</dt><dd style="grid-column:span 2">${escapeHtml(audit.notes)}</dd>` : ''}
+    </dl>
+
+    <h2>Data Quality Objectives (DQO) Summary</h2>
+    <span class="trim-note">${trimInfo}</span>
+    <div class="dqo-banner ${overallPass ? 'pass' : 'fail'}">
+        ${overallPass ? 'ALL PARAMETERS PASS DATA QUALITY OBJECTIVES' : 'ONE OR MORE PARAMETERS FAIL DATA QUALITY OBJECTIVES'}
+    </div>
+    <table class="dqo">
+        <thead><tr><th>Parameter</th><th>R\u00B2</th><th>Slope</th><th>Intercept</th><th>SD</th><th>RMSE</th><th>n</th><th>Result</th></tr></thead>
+        <tbody>${dqoRows}</tbody>
+    </table>
+    <div class="thresholds"><strong>Data Quality Objectives (DQO) Thresholds:</strong> ${thresholdNote}<br><span style="font-size:10px">Intercept, SD, and RMSE are expressed in the units of the measured parameter (ppb for gases, \u00B5g/m\u00B3 for particulate matter).</span></div>
+
+    <div id="report-charts-section"></div>
+
+    ${rawDataHtml}
+
+    <div class="report-footer">
+        ADEC Sensor Network Tracker \u2014 Audit Report \u2014 ${escapeHtml(communityName)} \u2014 ${dateRange}
+    </div>
+</body></html>`);
+
+    reportWindow.document.close();
+
+    // If we have cached data, render charts into the report window
+    if (cached) {
+        const chartsSection = reportWindow.document.getElementById('report-charts-section');
+        const chartResults = cached.regressionResults || results;
+
+        // Time Series section
+        let tsHtml = `<h2 style="font-size:16px;color:#1B2A4A;margin:28px 0 12px;border-bottom:2px solid #1B2A4A;padding-bottom:6px">Time Series</h2>
+            <span class="trim-note">Shaded region = first 24 hours (excluded from regression)</span>
+            <div class="chart-grid">`;
+        AUDIT_PARAMETERS.forEach(p => {
+            tsHtml += `<div class="chart-card"><h4>${p.label} (${p.unit})</h4><canvas id="report-ts-${p.key}"></canvas></div>`;
+        });
+        tsHtml += '</div>';
+
+        // Scatter section
+        let scatterHtml = `<div style="page-break-before:always"></div>
+            <h2 style="font-size:16px;color:#1B2A4A;margin:28px 0 12px;border-bottom:2px solid #1B2A4A;padding-bottom:6px">Regression Plots</h2>
+            <div class="chart-grid">`;
+        AUDIT_PARAMETERS.forEach(p => {
+            scatterHtml += `<div class="chart-card"><h4>${p.label} (${p.unit}) \u2014 ${escapeHtml(labelA)} vs ${escapeHtml(labelB)}</h4><canvas id="report-scatter-${p.key}"></canvas></div>`;
+        });
+        scatterHtml += '</div>';
+
+        chartsSection.innerHTML = tsHtml + scatterHtml;
+
+        // Load Chart.js in report window, then render
+        const chartScript = reportWindow.document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
+        chartScript.onload = () => {
+            const adapterScript = reportWindow.document.createElement('script');
+            adapterScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js';
+            adapterScript.onload = () => {
+                // Load annotation plugin for trim shading
+                const annotationScript = reportWindow.document.createElement('script');
+                annotationScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js';
+                annotationScript.onload = () => {
+                const RChart = reportWindow.Chart;
+                const trimTs = cached.trimIndex > 0 ? cached.allRows[cached.trimIndex].timestamp : null;
+
+                // Render time series
+                AUDIT_PARAMETERS.forEach(p => {
+                    const canvas = reportWindow.document.getElementById('report-ts-' + p.key);
+                    if (!canvas) return;
+                    const labels = cached.allRows.map(r => r.timestamp);
+                    const seriesA = cached.allRows.map(r => { const v = r.values[p.key]?.a; return isNaN(v) ? null : v; });
+                    const seriesB = cached.allRows.map(r => { const v = r.values[p.key]?.b; return isNaN(v) ? null : v; });
+                    const annotationConfig = trimTs ? {
+                        annotations: {
+                            trimBox: { type: 'box', xMin: labels[0], xMax: trimTs, backgroundColor: 'rgba(209,213,219,0.2)', borderColor: 'rgba(201,168,76,0.4)' },
+                            trimLine: { type: 'line', xMin: trimTs, xMax: trimTs, borderColor: '#C9A84C', borderWidth: 2, borderDash: [4, 4],
+                                label: { display: true, content: '24-hr trim', position: 'start', font: { size: 9 }, backgroundColor: 'rgba(255,255,255,0.8)' } }
+                        }
+                    } : undefined;
+                    new RChart(canvas, {
+                        type: 'line',
+                        data: { labels, datasets: [
+                            { label: labelA, data: seriesA, borderColor: '#1B2A4A', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
+                            { label: labelB, data: seriesB, borderColor: '#C9A84C', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
+                        ]},
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: true, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } }, annotation: annotationConfig },
+                            scales: {
+                                x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MMM d' } }, grid: { color: '#d1d5db' } },
+                                y: { title: { display: true, text: p.unit, font: { size: 10 } }, grid: { color: '#d1d5db' } },
+                            },
+                        },
+                    });
+                });
+
+                // Render scatter plots
+                AUDIT_PARAMETERS.forEach(p => {
+                    const canvas = reportWindow.document.getElementById('report-scatter-' + p.key);
+                    if (!canvas) return;
+                    const r = chartResults[p.key];
+                    if (!r || !r.pairs) return;
+                    const xVals = r.pairs.map(pt => pt.x);
+                    const yVals = r.pairs.map(pt => pt.y);
+                    const allVals = [...xVals, ...yVals];
+                    const minVal = Math.min(...allVals);
+                    const maxVal = Math.max(...allVals);
+                    const minX = Math.min(...xVals);
+                    const maxX = Math.max(...xVals);
+                    new RChart(canvas, {
+                        type: 'scatter',
+                        data: { datasets: [
+                            { label: p.label + ' data', data: r.pairs, backgroundColor: 'rgba(27,42,74,0.45)', borderColor: 'rgba(27,42,74,0.6)', pointRadius: 2.5, pointHoverRadius: 4 },
+                            { label: 'y = ' + r.slope + 'x ' + (r.intercept >= 0 ? '+ ' : '\u2212 ') + Math.abs(r.intercept), data: [{ x: minX, y: r.slope * minX + r.intercept }, { x: maxX, y: r.slope * maxX + r.intercept }], type: 'line', borderColor: '#C9A84C', borderWidth: 2, pointRadius: 0, fill: false },
+                            { label: '1:1 line', data: [{ x: minVal, y: minVal }, { x: maxVal, y: maxVal }], type: 'line', borderColor: 'rgba(150,150,150,0.5)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false },
+                        ]},
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } },
+                                title: { display: true, text: 'R\u00B2=' + r.r2 + '  Slope=' + r.slope + '  Intercept=' + r.intercept, font: { size: 10, family: "'JetBrains Mono', monospace" }, color: '#64748b' },
+                            },
+                            scales: {
+                                x: { min: minVal, max: maxVal, title: { display: true, text: labelA + ' (' + p.unit + ')', font: { size: 10 } }, grid: { color: '#d1d5db' } },
+                                y: { min: minVal, max: maxVal, title: { display: true, text: labelB + ' (' + p.unit + ')', font: { size: 10 } }, grid: { color: '#d1d5db' } },
+                            },
+                        },
+                    });
+                });
+                };
+                reportWindow.document.head.appendChild(annotationScript);
+            };
+            reportWindow.document.head.appendChild(adapterScript);
+        };
+        reportWindow.document.head.appendChild(chartScript);
+    }
 }
 
 async function uploadAuditPhotos(auditId, communityId, files) {
