@@ -5849,10 +5849,6 @@ function generateAuditReport(auditId) {
                 annotations.trimLabel = { type: 'label', xValue: new Date((firstTs.getTime() + trimTs.getTime()) / 2), yValue: 'max',
                     content: '24hrs excluded', font: { size: 8, style: 'italic' }, color: '#8a6d20', backgroundColor: 'rgba(255,248,232,0.8)', padding: 3, yAdjust: 6 };
             }
-            if (firstTs) annotations.auditStart = { type: 'line', xMin: firstTs, xMax: firstTs, borderColor: '#1B2A4A', borderWidth: 2,
-                label: { display: true, content: 'Audit Start', font: { size: 8 }, color: '#1B2A4A', backgroundColor: 'rgba(255,255,255,0.85)', position: 'start', padding: 2 } };
-            if (lastTs) annotations.auditEnd = { type: 'line', xMin: lastTs, xMax: lastTs, borderColor: '#1B2A4A', borderWidth: 2,
-                label: { display: true, content: 'Audit End', font: { size: 8 }, color: '#1B2A4A', backgroundColor: 'rgba(255,255,255,0.85)', position: 'start', padding: 2 } };
             chartImages['ts-' + p.key] = renderChartToImage({
                 type: 'line',
                 data: { labels, datasets: [
@@ -5862,7 +5858,10 @@ function generateAuditReport(auditId) {
                 options: {
                     responsive: false, animation: false,
                     plugins: { legend: { display: true, position: 'bottom', labels: { font: { size: 11 }, boxWidth: 14 } }, annotation: { annotations } },
-                    scales: { x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MMM d' } }, grid: { display: false } }, y: { title: { display: true, text: p.unit, font: { size: 12 } }, grid: { display: false } } },
+                    scales: {
+                        x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MMM d' } }, grid: { display: false } },
+                        y: { title: { display: true, text: p.label + ' (' + p.unit + ')', font: { size: 12 } }, grid: { display: false } },
+                    },
                 },
             });
         });
