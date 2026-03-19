@@ -2081,18 +2081,37 @@ tr:last-child td {
     margin: 0 0 10px;
 }
 
-.ov-sensor-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 8px;
+.ov-sensor-card {
+    padding: 10px;
+    border: 1px solid var(--slate-100);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background 0.15s;
+    transition: border-color 0.15s;
+    margin-bottom: 8px;
 }
 
-.ov-sensor-row:hover {
-    background: var(--slate-50);
+.ov-sensor-card:hover {
+    border-color: var(--navy-200);
+}
+
+.ov-sensor-id {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--slate-700);
+}
+
+.ov-sensor-type {
+    font-size: 11px;
+    color: var(--slate-400);
+    margin-bottom: 6px;
+}
+
+.ov-sensor-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
 }
 
 .ov-timeline-item {
@@ -2186,7 +2205,11 @@ tr:last-child td {
     border-color: rgba(255,255,255,0.06);
 }
 
-.dark-mode .ov-sensor-row:hover,
+.dark-mode .ov-sensor-card {
+    border-color: rgba(255,255,255,0.08);
+}
+
+.dark-mode .ov-sensor-card:hover,
 .dark-mode .ov-contact-row:hover {
     background: rgba(255,255,255,0.04);
 }
