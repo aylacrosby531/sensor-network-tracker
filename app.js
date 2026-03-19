@@ -171,6 +171,14 @@ function escapeHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Abbreviate sensor ID: MOD-00471 → Mod-471, MOD-X-PM-01656 → Mod-X-PM-1656
+function shortSensorId(id) {
+    if (!id) return '';
+    // Handle MOD-X-PM first (longer pattern), then standard MOD-
+    return id.replace(/MOD-X-PM-0*(\d+)/gi, 'Mod-X-PM-$1')
+             .replace(/MOD-0*(\d+)/gi, 'Mod-$1');
+}
+
 function hideAllAuthForms() {
     document.getElementById('login-form-section').style.display = 'none';
     document.getElementById('signup-form-section').style.display = 'none';
@@ -5151,10 +5159,13 @@ function parseAuditData(rows, audit) {
     const auditPodLocation = auditPodSensor?.community ? (COMMUNITIES.find(c => c.id === auditPodSensor.community)?.name || '') : '';
     const labelA = `${auditPodLocation ? auditPodLocation + ' ' : ''}${auditPodSensor?.type || 'Audit Pod'} ${audit.auditPodId}`.trim();
     const labelB = `${communityName} ${communityPodSensor?.type || 'Community Pod'} ${audit.communityPodId}`.trim();
+    // Short labels for chart titles: "Kodiak Pod 660" / "Audit Pod 471"
+    const shortA = `${auditPodSensor?.type || 'Audit Pod'} ${shortSensorId(audit.auditPodId)}`;
+    const shortB = `${communityName} Pod ${shortSensorId(audit.communityPodId)}`;
 
     return {
-        sensorA: { id: sensorA, label: labelA },
-        sensorB: { id: sensorB, label: labelB },
+        sensorA: { id: sensorA, label: labelA, short: shortA },
+        sensorB: { id: sensorB, label: labelB, short: shortB },
         allRows,
         trimIndex: trimIndex >= 0 ? trimIndex : 0,
         trimmedRows: trimIndex >= 0 ? allRows.slice(trimIndex) : allRows,
@@ -5435,7 +5446,7 @@ function renderScatterSection(auditId, parsed, results) {
         <h3 class="analysis-section-heading">Regression Plots</h3>
         <div class="analysis-chart-grid">
         ${AUDIT_PARAMETERS.map(p => `<div class="analysis-chart-card">
-            <h4>${p.label} (${p.unit}) \u2014 ${parsed.sensorA.label} vs ${parsed.sensorB.label}</h4>
+            <h4>${parsed.sensorB.short} and ${parsed.sensorA.short} \u2014 ${p.labelHtml}<br><span style="font-weight:400;font-size:11px;color:var(--slate-400)">Hourly data, first 24 hours removed</span></h4>
             <canvas id="scatter-${auditId}-${p.key}"></canvas>
         </div>`).join('')}
     </div>`;
@@ -5499,8 +5510,32 @@ function createScatterChart(canvasId, regression, param, parsed) {
                 },
             },
             scales: {
-                x: { title: { display: true, text: `${parsed.sensorA.label} (${param.unit})`, font: { size: 11 } }, grid: { display: false } },
-                y: { title: { display: true, text: `${parsed.sensorB.label} (${param.unit})`, font: { size: 11 } }, grid: { display: false } },
+                x: { title: { display: true, text: `${parsed.sensorA.short} (${param.unit})`, font: { size: 11 } }, grid: { display: false } },
+                y: { title: { display: true, text: `${parsed.sensorB.short} (${param.unit})`, font: { size: 11 } }, grid: { display: false } },
+            },
+            onClick: function(evt, elements, chart) {
+                const yAxis = chart.scales.y;
+                const xAxis = chart.scales.x;
+                const rect = chart.canvas.getBoundingClientRect();
+                const clickX = evt.native.clientX - rect.left;
+                const clickY = evt.native.clientY - rect.top;
+                if (clickX < yAxis.right) {
+                    const newMin = prompt('Y-axis minimum:', Math.round(yAxis.min * 10) / 10);
+                    const newMax = prompt('Y-axis maximum:', Math.round(yAxis.max * 10) / 10);
+                    if (newMin !== null && newMax !== null) {
+                        chart.options.scales.y.min = parseFloat(newMin);
+                        chart.options.scales.y.max = parseFloat(newMax);
+                        chart.update();
+                    }
+                } else if (clickY > xAxis.top) {
+                    const newMin = prompt('X-axis minimum:', Math.round(xAxis.min * 10) / 10);
+                    const newMax = prompt('X-axis maximum:', Math.round(xAxis.max * 10) / 10);
+                    if (newMin !== null && newMax !== null) {
+                        chart.options.scales.x.min = parseFloat(newMin);
+                        chart.options.scales.x.max = parseFloat(newMax);
+                        chart.update();
+                    }
+                }
             },
         },
     });
@@ -5514,7 +5549,7 @@ function renderTimeSeriesSection(auditId, parsed) {
         <h3 class="analysis-section-heading">PM Time Series</h3>
         <div class="analysis-chart-grid">
         ${pmParams.map(p => `<div class="analysis-chart-card">
-            <h4>${p.labelHtml} (${p.unit})</h4>
+            <h4>${parsed.sensorB.short} and ${parsed.sensorA.short} \u2014 ${p.labelHtml}<br><span style="font-weight:400;font-size:11px;color:var(--slate-400)">Hourly data, first 24 hours excluded from analysis</span></h4>
             <canvas id="ts-${auditId}-${p.key}"></canvas>
         </div>`).join('')}
     </div>`;
@@ -5541,31 +5576,30 @@ function createTimeSeriesChart(canvasId, parsed, param, audit) {
         return isNaN(v) ? null : v;
     });
 
+    // Calculate Y range from trimmed data only (excluding first 24h)
+    const trimmedVals = parsed.trimmedRows.flatMap(r => {
+        const a = r.values[param.key]?.a;
+        const b = r.values[param.key]?.b;
+        return [a, b].filter(v => !isNaN(v) && isFinite(v));
+    });
+    const yMin = trimmedVals.length > 0 ? Math.min(...trimmedVals) : undefined;
+    const yMax = trimmedVals.length > 0 ? Math.max(...trimmedVals) : undefined;
+    const yPad = (yMax - yMin) * 0.05 || 1;
+
     const trimTs = parsed.trimIndex > 0 ? parsed.allRows[parsed.trimIndex].timestamp : null;
     const firstTs = parsed.allRows[0]?.timestamp;
-    const lastTs = parsed.allRows[parsed.allRows.length - 1]?.timestamp;
 
-    // Build annotations: trim shading + audit start/end
+    // Annotations: just trim shading, no start/end labels
     const annotations = {};
     if (trimTs) {
         annotations.trimBox = { type: 'box', xMin: firstTs, xMax: trimTs, backgroundColor: 'rgba(255,248,232,0.45)', borderColor: 'rgba(201,168,76,0.3)' };
-        annotations.trimLabel = { type: 'label', xValue: new Date((firstTs.getTime() + trimTs.getTime()) / 2), yValue: 'max',
-            content: 'First 24 hrs excluded', font: { size: 8, style: 'italic' }, color: '#8a6d20', backgroundColor: 'rgba(255,248,232,0.8)', padding: 3, position: 'start', yAdjust: 6 };
-    }
-    if (firstTs) {
-        annotations.auditStart = { type: 'line', xMin: firstTs, xMax: firstTs, borderColor: '#1B2A4A', borderWidth: 2,
-            label: { display: true, content: 'Audit Start', font: { size: 8 }, color: '#1B2A4A', backgroundColor: 'rgba(255,255,255,0.85)', position: 'start', padding: 2 } };
-    }
-    if (lastTs) {
-        annotations.auditEnd = { type: 'line', xMin: lastTs, xMax: lastTs, borderColor: '#1B2A4A', borderWidth: 2,
-            label: { display: true, content: 'Audit End', font: { size: 8 }, color: '#1B2A4A', backgroundColor: 'rgba(255,255,255,0.85)', position: 'start', padding: 2 } };
     }
 
     const chart = new Chart(canvas, {
         type: 'line',
         data: { labels, datasets: [
-            { label: parsed.sensorA.label, data: seriesA, borderColor: '#1B2A4A', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
-            { label: parsed.sensorB.label, data: seriesB, borderColor: '#C9A84C', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
+            { label: parsed.sensorA.short, data: seriesA, borderColor: '#1B2A4A', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
+            { label: parsed.sensorB.short, data: seriesB, borderColor: '#C9A84C', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
         ]},
         options: {
             responsive: true,
@@ -5576,9 +5610,31 @@ function createTimeSeriesChart(canvasId, parsed, param, audit) {
             },
             scales: {
                 x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MMM d', hour: 'MMM d HH:mm' } }, grid: { display: false } },
-                y: { title: { display: true, text: param.unit, font: { size: 11 } }, grid: { display: false } },
+                y: {
+                    min: Math.max(0, yMin - yPad),
+                    max: yMax + yPad,
+                    title: { display: true, text: `${param.label} (${param.unit})`, font: { size: 11 } },
+                    grid: { display: false },
+                },
             },
             interaction: { mode: 'index', intersect: false },
+            onClick: function(evt, elements, chart) {
+                // Click on axis area to manually edit range
+                const xAxis = chart.scales.x;
+                const yAxis = chart.scales.y;
+                const rect = chart.canvas.getBoundingClientRect();
+                const clickX = evt.native.clientX - rect.left;
+                const clickY = evt.native.clientY - rect.top;
+                if (clickX < yAxis.right) {
+                    const newMin = prompt('Y-axis minimum:', Math.round(yAxis.min * 10) / 10);
+                    const newMax = prompt('Y-axis maximum:', Math.round(yAxis.max * 10) / 10);
+                    if (newMin !== null && newMax !== null) {
+                        chart.options.scales.y.min = parseFloat(newMin);
+                        chart.options.scales.y.max = parseFloat(newMax);
+                        chart.update();
+                    }
+                }
+            },
         },
     });
     analysisChartInstances.push(chart);
@@ -5694,6 +5750,8 @@ function generateAuditReport(auditId) {
     const auditPodLoc = auditPodSensor?.community ? (COMMUNITIES.find(c => c.id === auditPodSensor.community)?.name || '') : '';
     const labelA = `${auditPodLoc ? auditPodLoc + ' ' : ''}${auditPodSensor?.type || 'Audit Pod'} ${audit.auditPodId}`.trim();
     const labelB = `${communityName} ${communityPodSensor?.type || 'Community Pod'} ${audit.communityPodId}`.trim();
+    const shortA = `${auditPodSensor?.type || 'Audit Pod'} ${shortSensorId(audit.auditPodId)}`;
+    const shortB = `${communityName} Pod ${shortSensorId(audit.communityPodId)}`;
 
     const dateRange = audit.scheduledStart
         ? `${new Date(audit.scheduledStart + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} \u2013 ${new Date(audit.scheduledEnd + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
@@ -5798,8 +5856,8 @@ function generateAuditReport(auditId) {
             chartImages['ts-' + p.key] = renderChartToImage({
                 type: 'line',
                 data: { labels, datasets: [
-                    { label: labelA, data: seriesA, borderColor: '#1B2A4A', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
-                    { label: labelB, data: seriesB, borderColor: '#C9A84C', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
+                    { label: shortA, data: seriesA, borderColor: '#1B2A4A', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
+                    { label: shortB, data: seriesB, borderColor: '#C9A84C', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
                 ]},
                 options: {
                     responsive: false, animation: false,
@@ -5831,8 +5889,8 @@ function generateAuditReport(auditId) {
                         title: { display: true, text: 'R\u00B2 = ' + r.r2 + '   n = ' + r.n, font: { size: 11, family: "'JetBrains Mono', monospace" }, color: '#64748b' },
                     },
                     scales: {
-                        x: { title: { display: true, text: labelA + ' (' + p.unit + ')', font: { size: 10 } }, grid: { display: false } },
-                        y: { title: { display: true, text: labelB + ' (' + p.unit + ')', font: { size: 10 } }, grid: { display: false } },
+                        x: { title: { display: true, text: shortA + ' (' + p.unit + ')', font: { size: 10 } }, grid: { display: false } },
+                        y: { title: { display: true, text: shortB + ' (' + p.unit + ')', font: { size: 10 } }, grid: { display: false } },
                     },
                 },
             });
@@ -5844,9 +5902,9 @@ function generateAuditReport(auditId) {
     // Build PM time series HTML
     const pmParams = AUDIT_PARAMETERS.filter(p => p.hasTimeSeries);
     const tsHtml = pmParams.map(p => chartImages['ts-' + p.key]
-        ? `<div class="chart-card"><h4>${p.labelHtml} (${p.unit})</h4><img src="${chartImages['ts-' + p.key]}" style="width:100%"></div>` : '').join('');
+        ? `<div class="chart-card"><h4>${escapeHtml(shortB)} and ${escapeHtml(shortA)} \u2014 ${p.labelHtml}<br><span style="font-weight:400;font-size:11px;color:#94a3b8">Hourly data, first 24 hours excluded</span></h4><img src="${chartImages['ts-' + p.key]}" style="width:100%"></div>` : '').join('');
     const scatterHtml = AUDIT_PARAMETERS.map(p => chartImages['scatter-' + p.key]
-        ? `<div class="chart-card"><h4>${p.labelHtml} (${p.unit}) \u2014 ${escapeHtml(labelA)} vs ${escapeHtml(labelB)}</h4><img src="${chartImages['scatter-' + p.key]}" style="width:100%"></div>` : '').join('');
+        ? `<div class="chart-card"><h4>${escapeHtml(shortB)} and ${escapeHtml(shortA)} \u2014 ${p.labelHtml}<br><span style="font-weight:400;font-size:11px;color:#94a3b8">Hourly data, first 24 hours removed</span></h4><img src="${chartImages['scatter-' + p.key]}" style="width:100%"></div>` : '').join('');
 
     // Assemble full HTML
     const reportHtml = `<!DOCTYPE html>
