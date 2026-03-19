@@ -1647,6 +1647,14 @@ function showSensorView(sensorId) {
 
     filterSensorHistory();
 
+    // Show "View Service Tickets" button if sensor has tickets
+    const sensorTickets = serviceTickets.filter(t => t.sensorId === sensorId);
+    const viewTicketsBtn = document.getElementById('btn-view-sensor-tickets');
+    if (viewTicketsBtn) {
+        viewTicketsBtn.style.display = sensorTickets.length > 0 ? '' : 'none';
+        viewTicketsBtn.textContent = sensorTickets.length === 1 ? 'View Service Ticket' : `View Service Tickets (${sensorTickets.length})`;
+    }
+
     // Audits
     renderSensorAudits(sensorId);
 
@@ -4611,6 +4619,17 @@ function openNewTicketModal(preselectedSensorId) {
 }
 
 function openTicketFromSensor(sensorId) { openNewTicketModal(sensorId); }
+
+function viewSensorTickets(sensorId) {
+    const tickets = serviceTickets.filter(t => t.sensorId === sensorId);
+    if (tickets.length === 1) {
+        openTicketDetail(tickets[0].id);
+    } else if (tickets.length > 1) {
+        // Open the most recent non-closed ticket, or the most recent one
+        const active = tickets.find(t => t.status !== 'Closed') || tickets[0];
+        openTicketDetail(active.id);
+    }
+}
 
 async function saveNewTicket(event) {
     event.preventDefault();

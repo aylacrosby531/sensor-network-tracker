@@ -345,7 +345,8 @@
                     <div class="history-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                         <button class="btn btn-primary" onclick="openAddNoteModal(currentSensor, 'sensor')">+ Add Note</button>
                         <button class="btn" onclick="openCollocationModal(currentSensor)" style="border-color:var(--navy-400);color:var(--navy-500)">+ Log Collocation</button>
-                        <button class="btn btn-service" onclick="openTicketFromSensor(currentSensor)">&#9888; Service Ticket</button>
+                        <button class="btn btn-service" onclick="openTicketFromSensor(currentSensor)">+ New Service Ticket</button>
+                        <button class="btn" onclick="viewSensorTickets(currentSensor)" id="btn-view-sensor-tickets" style="display:none;border-color:var(--slate-300);color:var(--slate-500)">View Service Tickets</button>
                         <select id="sensor-history-filter" onchange="filterSensorHistory()">
                             <option value="">All History</option>
                             <option value="_notes">Field Notes</option>
