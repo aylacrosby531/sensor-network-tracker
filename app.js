@@ -4608,7 +4608,6 @@ function updateSidebarAuditCount() {
 function renderAuditsView() {
     updateSidebarAuditCount();
     const statusFilter = document.getElementById('audit-status-filter')?.value || '';
-    const showUnaudited = document.getElementById('audit-show-unaudited')?.checked || false;
     let filtered = [...audits];
     if (statusFilter) filtered = filtered.filter(a => a.status === statusFilter);
 
@@ -4621,16 +4620,6 @@ function renderAuditsView() {
             ${items.length === 0 ? '<p style="font-size:13px;color:var(--slate-400)">No audits</p>' : items.map(renderAuditCard).join('')}
         </div>`;
     }).join('');
-
-    const unauditedDiv = document.getElementById('audit-unaudited');
-    if (showUnaudited) {
-        const unaudited = getUnauditedCommunities();
-        unauditedDiv.style.display = '';
-        unauditedDiv.innerHTML = `<h3 style="margin-top:24px;font-size:14px;color:var(--slate-600)">Communities Not Yet Audited (${unaudited.length})</h3>
-            <div class="audit-unaudited-grid">${unaudited.map(c => `<div class="audit-unaudited-card" onclick="openNewAuditModal('${c.id}')">
-                <span>${escapeHtml(c.name)}</span><span class="btn btn-sm" style="font-size:11px">Schedule</span>
-            </div>`).join('')}</div>`;
-    } else { unauditedDiv.style.display = 'none'; }
 }
 
 function renderAuditCard(audit) {
