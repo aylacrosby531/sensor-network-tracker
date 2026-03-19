@@ -5589,11 +5589,9 @@ function renderScatterSection(auditId, parsed, results) {
             return `<div class="analysis-chart-card">
             <div class="chart-title-editable" onclick="editChartTitle(this)">${parsed.sensorB.short} and ${parsed.sensorA.short} \u2014 ${p.labelHtml}</div>
             <div class="chart-subtitle-editable" onclick="editChartTitle(this)">${auditDateRange}. Hourly data, first 24 hours removed</div>
-            <div class="chart-axis-label chart-axis-y" onclick="editChartTitle(this)">${parsed.sensorB.short} ${p.label} (${p.unit})</div>
-            <div class="chart-scale-btn chart-scale-btn-y" onclick="editChartAxis('scatter-${auditId}-${p.key}', 'y', this)" title="Click to edit Y range">&#9998;</div>
+            <div class="chart-axis-label chart-axis-y" onclick="editChartTitle(this)">${parsed.sensorB.short} ${p.label} (${p.unit}) <span class="chart-scale-btn" onclick="event.stopPropagation(); editChartAxis('scatter-${auditId}-${p.key}', 'y', this)">&#9998;</span></div>
             <canvas id="scatter-${auditId}-${p.key}"></canvas>
-            <div class="chart-scale-btn chart-scale-btn-x" onclick="editChartAxis('scatter-${auditId}-${p.key}', 'x', this)" title="Click to edit X range">&#9998;</div>
-            <div class="chart-axis-label chart-axis-x" onclick="editChartTitle(this)">${parsed.sensorA.short} ${p.label} (${p.unit})</div>
+            <div class="chart-axis-label chart-axis-x" onclick="editChartTitle(this)">${parsed.sensorA.short} ${p.label} (${p.unit}) <span class="chart-scale-btn" onclick="event.stopPropagation(); editChartAxis('scatter-${auditId}-${p.key}', 'x', this)">&#9998;</span></div>
             <div class="chart-equation">${eqText}</div>
         </div>`; }).join('')}
     </div>`;
@@ -5693,8 +5691,7 @@ function renderTimeSeriesSection(auditId, parsed) {
         ${pmParams.map(p => `<div class="analysis-chart-card">
             <div class="chart-title-editable" onclick="editChartTitle(this)">${parsed.sensorB.short} and ${parsed.sensorA.short} \u2014 ${p.labelHtml}</div>
             <div class="chart-subtitle-editable" onclick="editChartTitle(this)">${auditDateRange}. Hourly data, first 24 hours removed</div>
-            <div class="chart-axis-label chart-axis-y" onclick="editChartTitle(this)">${p.labelHtml} (${p.unit})</div>
-            <div class="chart-scale-btn chart-scale-btn-y" onclick="editChartAxis('ts-${auditId}-${p.key}', 'y', this)" title="Click to edit Y range">&#9998;</div>
+            <div class="chart-axis-label chart-axis-y" onclick="editChartTitle(this)">${p.labelHtml} (${p.unit}) <span class="chart-scale-btn" onclick="event.stopPropagation(); editChartAxis('ts-${auditId}-${p.key}', 'y', this)">&#9998;</span></div>
             <canvas id="ts-${auditId}-${p.key}"></canvas>
             <div class="chart-ts-legend">
                 <span class="chart-ts-legend-item"><span style="background:#1B2A4A"></span> ${parsed.sensorA.short}</span>
