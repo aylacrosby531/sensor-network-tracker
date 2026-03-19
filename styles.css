@@ -2243,18 +2243,6 @@ tr:last-child td {
     opacity: 0.6;
 }
 
-.ov-view-all {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--navy-500);
-    cursor: pointer;
-    display: inline-block;
-    margin-top: 8px;
-}
-
-.ov-view-all:hover {
-    text-decoration: underline;
-}
 
 .ov-empty {
     font-size: 13px;
@@ -2297,7 +2285,7 @@ tr:last-child td {
     padding: 16px;
 }
 
-.analysis-chart-card h4 {
+.analysis-chart-card h3 {
     font-size: 13px;
     font-weight: 600;
     color: var(--slate-700);

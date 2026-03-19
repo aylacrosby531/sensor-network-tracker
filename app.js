@@ -5632,7 +5632,7 @@ function renderSavedAnalysisView(auditId) {
         <div style="overflow-x:auto;margin-top:16px">
         <table class="dqo-summary-table">
             <thead><tr>
-                <th>Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
+                <th scope="col">Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
                 <th>R\u00B2 <span class="dqo-thresh">(\u2265 ${T.r2.min})</span></th>
                 <th>Slope <span class="dqo-thresh">(${T.slope.min}\u2013${T.slope.max})</span></th>
                 <th>Intercept <span class="dqo-thresh">(${T.intercept.min} to ${T.intercept.max})</span></th>
@@ -5676,7 +5676,7 @@ function renderDQOSection(results, overallPass) {
         <div style="overflow-x:auto">
         <table class="dqo-summary-table">
             <thead><tr>
-                <th>Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
+                <th scope="col">Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
                 <th>R\u00B2 <span class="dqo-thresh">(\u2265 ${T.r2.min})</span></th>
                 <th>Slope <span class="dqo-thresh">(${T.slope.min}\u2013${T.slope.max})</span></th>
                 <th>Intercept <span class="dqo-thresh">(${T.intercept.min} to ${T.intercept.max})</span></th>
@@ -6027,7 +6027,7 @@ function renderCommunityOverview(communityId) {
                 ${s.location ? `<div class="ov-sensor-field">${escapeHtml(s.location)}</div>` : ''}
                 ${s.dateInstalled ? `<div class="ov-sensor-field">Installed ${formatDate(s.dateInstalled)}</div>` : ''}
             </div>
-        </div>`).join('') + (commSensors.length > 4 ? `<div style="margin-top:4px"><a class="ov-view-all" onclick="activateCommunityTab('community-sensors')">View all ${commSensors.length} sensors &rarr;</a></div>` : '')
+        </div>`).join('')
         : '<p class="ov-empty">No sensors assigned</p>';
 
     // Recent history (3 items)
@@ -6042,7 +6042,7 @@ function renderCommunityOverview(communityId) {
             <span class="ov-timeline-type">${n.type}</span>
             <span class="ov-timeline-text">${escapeHtml((n.text || '').substring(0, 100))}${(n.text || '').length > 100 ? '...' : ''}</span>
             <span class="ov-timeline-date">${formatDate(n.date || n.createdAt)}</span>
-        </div>`).join('') + `<div><a class="ov-view-all" onclick="activateCommunityTab('community-history')">View all history &rarr;</a></div>`
+        </div>`).join('')
         : '<p class="ov-empty">No history yet</p>';
 
     // Recent comms (3 items)
@@ -6053,7 +6053,7 @@ function renderCommunityOverview(communityId) {
             <span class="ov-timeline-type">${c.commType || c.type}</span>
             <span class="ov-timeline-text">${escapeHtml((c.text || '').substring(0, 100))}${(c.text || '').length > 100 ? '...' : ''}</span>
             <span class="ov-timeline-date">${formatDate(c.date || c.createdAt)}</span>
-        </div>`).join('') + `<div><a class="ov-view-all" onclick="activateCommunityTab('community-comms')">View all comms &rarr;</a></div>`
+        </div>`).join('')
         : '<p class="ov-empty">No communications yet</p>';
 
     // Top contacts (2)
@@ -6062,7 +6062,7 @@ function renderCommunityOverview(communityId) {
         ? commContacts.map(c => `<div class="ov-contact-row" onclick="showContactDetail('${c.id}')">
             <div><strong>${escapeHtml(c.name)}</strong></div>
             <div style="font-size:12px;color:var(--slate-400)">${escapeHtml(c.role || '')}${c.org ? ` \u00B7 ${escapeHtml(c.org)}` : ''}</div>
-        </div>`).join('') + `<div><a class="ov-view-all" onclick="activateCommunityTab('community-contacts')">View all contacts &rarr;</a></div>`
+        </div>`).join('')
         : '<p class="ov-empty">No contacts yet</p>';
 
     // Most recent audit
@@ -6076,29 +6076,29 @@ function renderCommunityOverview(communityId) {
             </div>
             <div style="font-size:12px;color:var(--slate-400);margin-top:4px">${recentAudit.scheduledStart ? formatDate(recentAudit.scheduledStart) + ' \u2013 ' + formatDate(recentAudit.scheduledEnd) : '\u2014'}</div>
             ${Object.keys(recentAudit.analysisResults || {}).length > 0 ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${AUDIT_PARAMETERS.map(p => { const r = recentAudit.analysisResults[p.key]; if (!r) return ''; return `<span class="audit-param-badge ${r.pass ? 'pass' : 'fail'}">${p.label} ${r.pass ? '\u2713' : '\u2717'}</span>`; }).join('')}</div>` : ''}
-        </div>` + (communityAudits.length > 1 ? `<div><a class="ov-view-all" onclick="activateCommunityTab('community-audits')">View all ${communityAudits.length} audits &rarr;</a></div>` : '')
+        </div>`
         : '<p class="ov-empty">No audits yet</p>';
 
     dashboard.innerHTML = `
         <div class="community-overview-grid">
             <div class="ov-card">
-                <h4 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-sensors')">Sensors <span class="ov-card-expand">&rarr;</span></h4>
+                <h3 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-sensors')">Sensors <span class="ov-card-expand">&rarr;</span></h3>
                 ${sensorHtml}
             </div>
             <div class="ov-card">
-                <h4 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-contacts')">Contacts <span class="ov-card-expand">&rarr;</span></h4>
+                <h3 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-contacts')">Contacts <span class="ov-card-expand">&rarr;</span></h3>
                 ${contactsHtml}
             </div>
             <div class="ov-card ov-card-wide">
-                <h4 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-history')">Recent History <span class="ov-card-expand">&rarr;</span></h4>
+                <h3 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-history')">Recent History <span class="ov-card-expand">&rarr;</span></h3>
                 ${historyHtml}
             </div>
             <div class="ov-card ov-card-wide">
-                <h4 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-comms')">Recent Communications <span class="ov-card-expand">&rarr;</span></h4>
+                <h3 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-comms')">Recent Communications <span class="ov-card-expand">&rarr;</span></h3>
                 ${commsHtml}
             </div>
             <div class="ov-card">
-                <h4 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-audits')">Most Recent Audit <span class="ov-card-expand">&rarr;</span></h4>
+                <h3 class="ov-card-title ov-card-clickable" onclick="activateCommunityTab('community-audits')">Most Recent Audit <span class="ov-card-expand">&rarr;</span></h3>
                 ${auditHtml}
             </div>
         </div>
@@ -6250,7 +6250,7 @@ function generateAuditReport(auditId) {
                     ${cached.allRows.map((r, i) => {
                         const isTrimmed = i < cached.trimIndex;
                         const dateStr = r.timestamp.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
-                        return `<tr style="${isTrimmed ? 'opacity:0.4;background:#fff8e8' : (i % 2 === 0 ? '' : 'background:#fafbfc')}">
+                        return `<tr style="${isTrimmed ? 'color:#6b7280;background:#fffbf0' : (i % 2 === 0 ? '' : 'background:#fafbfc')}">
                             <td style="padding:3px 6px;border-bottom:1px solid #e2e8f0">${dateStr}${isTrimmed ? ' *' : ''}</td>
                             ${paramKeys.map(k => {
                                 const va = r.values[k]?.a;
@@ -6341,7 +6341,7 @@ function generateAuditReport(auditId) {
     const pmParams = AUDIT_PARAMETERS.filter(p => p.hasTimeSeries);
     const tsHtml = pmParams.map(p => chartImages['ts-' + p.key]
         ? `<div class="chart-card">
-            <h4>${escapeHtml(shortB)} and ${escapeHtml(shortA)}: <strong>${p.labelHtml}</strong></h4>
+            <h3>${escapeHtml(shortB)} and ${escapeHtml(shortA)}: <strong>${p.labelHtml}</strong></h3>
             <div class="chart-sub">${dateRange}. Hourly data, first 24 hours removed</div>
             <img src="${chartImages['ts-' + p.key]}" style="width:100%" alt="Timeseries chart for ${p.label}">
             <div class="chart-legend"><span><span style="background:#1B2A4A;display:inline-block;width:20px;height:4px;border-radius:2px;vertical-align:middle"></span> ${escapeHtml(shortA)}</span><span><span style="background:#C9A84C;display:inline-block;width:20px;height:4px;border-radius:2px;vertical-align:middle"></span> ${escapeHtml(shortB)}</span></div>
@@ -6352,7 +6352,7 @@ function generateAuditReport(auditId) {
         const eqText = r ? `y = ${r.slope}x ${eqSign} ${Math.abs(r.intercept)},&nbsp;&nbsp;&nbsp;&nbsp; R\u00B2 = ${r.r2}` : '';
         return chartImages['scatter-' + p.key]
         ? `<div class="chart-card">
-            <h4>${escapeHtml(shortB)} and ${escapeHtml(shortA)}: <strong>${p.labelHtml}</strong></h4>
+            <h3>${escapeHtml(shortB)} and ${escapeHtml(shortA)}: <strong>${p.labelHtml}</strong></h3>
             <div class="chart-sub">${dateRange}. Hourly data, first 24 hours removed</div>
             <img src="${chartImages['scatter-' + p.key]}" style="width:100%" alt="Regression scatter plot for ${p.label}">
             <div class="chart-eq">${eqText}</div>
@@ -6448,7 +6448,7 @@ function generateAuditReport(auditId) {
     <span class="trim-note">${trimInfo}</span>
     <table class="dqo">
         <thead><tr>
-            <th>Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
+            <th scope="col">Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
             <th>R\u00B2 <span class="dqo-thresh">(\u2265 ${T.r2.min})</span></th>
             <th>Slope <span class="dqo-thresh">(${T.slope.min}\u2013${T.slope.max})</span></th>
             <th>Intercept <span class="dqo-thresh">(${T.intercept.min} to ${T.intercept.max})</span></th>
