@@ -6462,17 +6462,19 @@ function generateAuditReport(auditId) {
     .print-controls button { padding: 10px 24px; font-size: 14px; font-family: 'DM Sans', sans-serif; font-weight: 600; background: #1B2A4A; color: white; border: none; border-radius: 8px; cursor: pointer; }
     .print-controls label { font-size: 13px; color: #64748b; display: flex; align-items: center; gap: 6px; cursor: pointer; }
     0; text-align: center; }
+    .report-section { break-inside: avoid; page-break-inside: avoid; }
     @media print {
         body { padding: 16px; padding-top: 32px; }
         .no-print { display: none !important; }
         h2 { break-after: avoid; page-break-after: avoid; margin-top: 20px; }
         h1 { margin-top: 12px; }
+        .report-section { break-inside: avoid; page-break-inside: avoid; }
         .chart-card { break-inside: avoid; page-break-inside: avoid; }
-        .chart-grid { break-before: auto; }
-        .report-header-bar { break-inside: avoid; }
+        .chart-grid { break-before: avoid; page-break-before: avoid; }
+        .report-header-bar { break-inside: avoid; page-break-inside: avoid; }
         .report-meta { break-inside: avoid; page-break-inside: avoid; }
         table.dqo { break-inside: avoid; page-break-inside: avoid; }
-        .thresholds { break-before: avoid; }
+        .thresholds { break-before: avoid; page-break-before: avoid; }
         table.dqo tbody tr:nth-child(even), .chart-legend, .chart-eq, .chart-sub, .trim-note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
 </style>
@@ -6491,6 +6493,7 @@ function generateAuditReport(auditId) {
         </div>
     </div>
 
+    <section class="report-section">
     <h2>Audit Details</h2>
     <dl class="report-meta">
         <dt>Community</dt><dd>${escapeHtml(communityName)}</dd>
@@ -6501,7 +6504,9 @@ function generateAuditReport(auditId) {
         <dt>Installation / Removal By</dt><dd>${escapeHtml(audit.conductedBy || '\u2014')}</dd>
         ${audit.notes ? `<dt>Notes</dt><dd style="grid-column:span 3">${escapeHtml(audit.notes)}</dd>` : ''}
     </dl>
+    </section>
 
+    <section class="report-section">
     <h2>Data Quality Objectives (DQO) Summary</h2>
     <span class="trim-note">${trimInfo}</span>
     <table class="dqo">
@@ -6517,14 +6522,16 @@ function generateAuditReport(auditId) {
         <tbody>${dqoRows}</tbody>
     </table>
     <div class="thresholds">Intercept, SD, and RMSE are expressed in the units of the measured parameter (ppb for gases, \u00B5g/m\u00B3 for particulate matter). PM<sub>10</sub> values exceeding 1000 \u00B5g/m\u00B3 were invalidated prior to analysis.</div>
+    </section>
 
-    ${tsHtml ? `<h2>PM Timeseries</h2><div class="chart-grid">${tsHtml}</div>` : ''}
+    ${tsHtml ? `<section class="report-section"><h2>PM Timeseries</h2><div class="chart-grid">${tsHtml}</div></section>` : ''}
 
     ${scatterCards.length > 0 ? (() => {
-        let out = '<h2>Regression Plots</h2>';
+        let out = '';
         for (let i = 0; i < scatterCards.length; i += 2) {
-            if (i > 0) out += '<h2>Regression Plots (continued)</h2>';
-            out += '<div class="chart-grid">' + scatterCards.slice(i, i + 2).join('') + '</div>';
+            const heading = i === 0 ? 'Regression Plots' : 'Regression Plots (continued)';
+            out += '<section class="report-section"><h2>' + heading + '</h2>';
+            out += '<div class="chart-grid">' + scatterCards.slice(i, i + 2).join('') + '</div></section>';
         }
         return out;
     })() : ''}

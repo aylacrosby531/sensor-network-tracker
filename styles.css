@@ -4182,7 +4182,11 @@ th:hover .field-reorder-btns {
     .modal:not(.open) { display: none !important; }
     .modal-content { max-width: 100% !important; box-shadow: none !important; border: none !important; max-height: none !important; overflow: visible !important; }
     .modal-close { display: none !important; }
-    .dqo-summary-table, .analysis-chart-card, .timeline-item { break-inside: avoid; }
+    .dqo-summary-table, .analysis-chart-card, .timeline-item { break-inside: avoid; page-break-inside: avoid; }
+    .report-section { break-inside: avoid; page-break-inside: avoid; }
+    .analysis-section-heading { break-after: avoid; page-break-after: avoid; }
+    .analysis-chart-grid { break-before: avoid; page-break-before: avoid; }
+    #analysis-section-dqo, #analysis-section-timeseries, #analysis-section-scatter { break-inside: avoid; page-break-inside: avoid; }
     .dqo-overall, .dqo-pass, .dqo-fail, .audit-param-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @page { margin: 0.5in; }
 }
