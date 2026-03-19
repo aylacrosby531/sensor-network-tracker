@@ -5939,8 +5939,12 @@ function renderCommunityOverview(communityId) {
     const dashboard = document.getElementById('community-overview-dashboard');
     if (!dashboard) return;
 
+    // Include child communities in all queries
+    const children = getChildCommunities(communityId);
+    const allCommunityIds = [communityId, ...children.map(c => c.id)];
+
     // Sensor summary
-    const commSensors = sensors.filter(s => s.community === communityId);
+    const commSensors = sensors.filter(s => allCommunityIds.includes(s.community));
     const sensorHtml = commSensors.length > 0
         ? commSensors.slice(0, 3).map(s => `<div class="ov-sensor-row" onclick="showSensorDetail('${s.id}')">
             <span style="font-family:var(--font-mono);font-size:13px;font-weight:600">${s.id}</span>
@@ -5950,8 +5954,6 @@ function renderCommunityOverview(communityId) {
         : '<p class="ov-empty">No sensors assigned</p>';
 
     // Recent history (3 items)
-    const children = getChildCommunities(communityId);
-    const allCommunityIds = [communityId, ...children.map(c => c.id)];
     const sensorIdsInCommunity = sensors.filter(s => allCommunityIds.includes(s.community)).map(s => s.id);
     const commNotes = notes.filter(n => {
         if (n.taggedCommunities && n.taggedCommunities.some(id => allCommunityIds.includes(id))) return true;
@@ -5987,7 +5989,7 @@ function renderCommunityOverview(communityId) {
         : '<p class="ov-empty">No contacts yet</p>';
 
     // Most recent audit
-    const communityAudits = audits.filter(a => a.communityId === communityId).sort((a, b) => (b.scheduledEnd || '').localeCompare(a.scheduledEnd || ''));
+    const communityAudits = audits.filter(a => allCommunityIds.includes(a.communityId)).sort((a, b) => (b.scheduledEnd || '').localeCompare(a.scheduledEnd || ''));
     const recentAudit = communityAudits[0];
     const auditHtml = recentAudit
         ? `<div class="ov-audit-card" onclick="openAuditDetail('${recentAudit.id}')">
