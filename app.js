@@ -4848,7 +4848,7 @@ function openAuditDetail(auditId) {
     }).join('');
 
     const analysisHtml = Object.keys(audit.analysisResults || {}).length > 0
-        ? `<table class="analysis-results-table"><thead><tr><th>Parameter</th><th>R\u00B2</th><th>Slope</th><th>Intercept</th><th>Result</th></tr></thead><tbody>
+        ? `<table class="analysis-results-table"><thead><tr><th>Parameter<br><span style="font-weight:400;font-size:10px;text-transform:none">(DQO Threshold)</span></th><th>R\u00B2</th><th>Slope</th><th>Intercept</th><th>Result</th></tr></thead><tbody>
             ${AUDIT_PARAMETERS.map(p => { const r = (audit.analysisResults || {})[p.key]; if (!r) return ''; return `<tr><td>${p.label} (${p.unit})</td><td>${r.r2 ?? '—'}</td><td>${r.slope ?? '—'}</td><td>${r.intercept ?? '—'}</td><td>${r.pass ? '<span style="color:var(--aurora-green);font-weight:600">PASS</span>' : '<span style="color:var(--aurora-rose);font-weight:600">FAIL</span>'}</td></tr>`; }).join('')}
            </tbody></table>`
         : '<p style="font-size:13px;color:var(--slate-400)">No analysis results yet.</p>';
@@ -5625,7 +5625,7 @@ function renderSavedAnalysisView(auditId) {
         <div style="overflow-x:auto;margin-top:16px">
         <table class="dqo-summary-table">
             <thead><tr>
-                <th>Parameter</th>
+                <th>Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
                 <th>R\u00B2 <span class="dqo-thresh">(\u2265 ${T.r2.min})</span></th>
                 <th>Slope <span class="dqo-thresh">(${T.slope.min}\u2013${T.slope.max})</span></th>
                 <th>Intercept <span class="dqo-thresh">(${T.intercept.min} to ${T.intercept.max})</span></th>
@@ -5669,7 +5669,7 @@ function renderDQOSection(results, overallPass) {
         <div style="overflow-x:auto">
         <table class="dqo-summary-table">
             <thead><tr>
-                <th>Parameter</th>
+                <th>Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
                 <th>R\u00B2 <span class="dqo-thresh">(\u2265 ${T.r2.min})</span></th>
                 <th>Slope <span class="dqo-thresh">(${T.slope.min}\u2013${T.slope.max})</span></th>
                 <th>Intercept <span class="dqo-thresh">(${T.intercept.min} to ${T.intercept.max})</span></th>
@@ -5710,7 +5710,7 @@ function renderScatterSection(auditId, parsed, results) {
         ${AUDIT_PARAMETERS.map(p => {
             const r = results[p.key];
             const eqSign = r ? (r.intercept >= 0 ? '+' : '\u2212') : '';
-            const eqText = r ? `y = ${r.slope}x ${eqSign} ${Math.abs(r.intercept)},  R\u00B2 = ${r.r2}` : '';
+            const eqText = r ? `y = ${r.slope}x ${eqSign} ${Math.abs(r.intercept)},&nbsp;&nbsp;&nbsp;&nbsp; R\u00B2 = ${r.r2}` : '';
             return `<div class="analysis-chart-card">
             <div class="chart-title-editable" onclick="editChartTitle(this)">${parsed.sensorB.short} and ${parsed.sensorA.short}: <strong>${p.labelHtml}</strong></div>
             <div class="chart-subtitle-editable" onclick="editChartTitle(this)">${auditDateRange}. Hourly data, first 24 hours removed</div>
@@ -6271,8 +6271,8 @@ function generateAuditReport(auditId) {
                     responsive: false, animation: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MMM d' } }, grid: { display: false }, ticks: { font: { size: 18 } } },
-                        y: { title: { display: true, text: p.label + ' (' + p.unit + ')', font: { size: 20, weight: '600' } }, grid: { display: false }, ticks: { font: { size: 18 } } },
+                        x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MMM d' } }, grid: { display: false }, ticks: { font: { size: 22 } } },
+                        y: { title: { display: true, text: p.label + ' (' + p.unit + ')', font: { size: 24, weight: '600' } }, grid: { display: false }, ticks: { font: { size: 22 } } },
                     },
                 },
             });
@@ -6297,8 +6297,8 @@ function generateAuditReport(auditId) {
                     responsive: false, animation: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { title: { display: true, text: shortA + ' ' + p.label + ' (' + p.unit + ')', font: { size: 20, weight: '600' } }, grid: { display: false }, ticks: { font: { size: 18 } } },
-                        y: { title: { display: true, text: shortB + ' ' + p.label + ' (' + p.unit + ')', font: { size: 20, weight: '600' } }, grid: { display: false }, ticks: { font: { size: 18 } } },
+                        x: { title: { display: true, text: shortA + ' ' + p.label + ' (' + p.unit + ')', font: { size: 24, weight: '600' } }, grid: { display: false }, ticks: { font: { size: 22 } } },
+                        y: { title: { display: true, text: shortB + ' ' + p.label + ' (' + p.unit + ')', font: { size: 24, weight: '600' } }, grid: { display: false }, ticks: { font: { size: 22 } } },
                     },
                 },
             });
@@ -6316,10 +6316,10 @@ function generateAuditReport(auditId) {
             <img src="${chartImages['ts-' + p.key]}" style="width:100%">
             <div class="chart-legend"><span><span style="background:#1B2A4A;display:inline-block;width:20px;height:4px;border-radius:2px;vertical-align:middle"></span> ${escapeHtml(shortA)}</span><span><span style="background:#C9A84C;display:inline-block;width:20px;height:4px;border-radius:2px;vertical-align:middle"></span> ${escapeHtml(shortB)}</span></div>
         </div>` : '').join('');
-    const scatterHtml = AUDIT_PARAMETERS.map(p => {
+    const scatterCards = AUDIT_PARAMETERS.map(p => {
         const r = (cached.regressionResults || results)[p.key];
         const eqSign = r ? (r.intercept >= 0 ? '+' : '\u2212') : '';
-        const eqText = r ? `y = ${r.slope}x ${eqSign} ${Math.abs(r.intercept)},  R\u00B2 = ${r.r2}` : '';
+        const eqText = r ? `y = ${r.slope}x ${eqSign} ${Math.abs(r.intercept)},&nbsp;&nbsp;&nbsp;&nbsp; R\u00B2 = ${r.r2}` : '';
         return chartImages['scatter-' + p.key]
         ? `<div class="chart-card">
             <h4>${escapeHtml(shortB)} and ${escapeHtml(shortA)}: <strong>${p.labelHtml}</strong></h4>
@@ -6327,7 +6327,7 @@ function generateAuditReport(auditId) {
             <img src="${chartImages['scatter-' + p.key]}" style="width:100%">
             <div class="chart-eq">${eqText}</div>
         </div>` : '';
-    }).join('');
+    }).filter(Boolean);
 
     // Assemble full HTML
     const reportHtml = `<!DOCTYPE html>
@@ -6375,9 +6375,10 @@ function generateAuditReport(auditId) {
     .print-controls label { font-size: 13px; color: #64748b; display: flex; align-items: center; gap: 6px; cursor: pointer; }
     .report-footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
     @media print {
-        body { padding: 16px; }
+        body { padding: 16px; padding-top: 32px; }
         .no-print { display: none !important; }
-        h2 { break-after: avoid; page-break-after: avoid; margin-top: 16px; }
+        h2 { break-after: avoid; page-break-after: avoid; margin-top: 20px; }
+        h1 { margin-top: 12px; }
         .chart-card { break-inside: avoid; page-break-inside: avoid; }
         .chart-grid { break-before: auto; }
         .report-header-bar { break-inside: avoid; }
@@ -6417,7 +6418,7 @@ function generateAuditReport(auditId) {
     <span class="trim-note">${trimInfo}</span>
     <table class="dqo">
         <thead><tr>
-            <th>Parameter</th>
+            <th>Parameter<br><span class="dqo-thresh">(DQO Threshold)</span></th>
             <th>R\u00B2 <span class="dqo-thresh">(\u2265 ${T.r2.min})</span></th>
             <th>Slope <span class="dqo-thresh">(${T.slope.min}\u2013${T.slope.max})</span></th>
             <th>Intercept <span class="dqo-thresh">(${T.intercept.min} to ${T.intercept.max})</span></th>
@@ -6431,8 +6432,14 @@ function generateAuditReport(auditId) {
 
     ${tsHtml ? `<h2>PM Timeseries</h2><div class="chart-grid">${tsHtml}</div>` : ''}
 
-    <h2>Regression Plots</h2>
-    <div class="chart-grid">${scatterHtml}</div>
+    ${scatterCards.length > 0 ? (() => {
+        let out = '<h2>Regression Plots</h2>';
+        for (let i = 0; i < scatterCards.length; i += 2) {
+            if (i > 0) out += '<h2>Regression Plots (continued)</h2>';
+            out += '<div class="chart-grid">' + scatterCards.slice(i, i + 2).join('') + '</div>';
+        }
+        return out;
+    })() : ''}
 
     <div id="report-dataset-section">${rawDataHtml}</div>
 
