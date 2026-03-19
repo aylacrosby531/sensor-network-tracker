@@ -5426,7 +5426,7 @@ function renderAnalysisResults(auditId, parsed) {
     // DQO Summary — inline at top
     renderDQOSection(results, overallPass);
 
-    // Time Series — below DQO
+    // Timeseries — below DQO
     renderTimeSeriesSection(auditId, parsed);
 
     // Scatter/Regression Plots — below time series (use cached full results with pairs data for charts)
@@ -5654,7 +5654,7 @@ function renderTimeSeriesSection(auditId, parsed) {
     const el = document.getElementById('analysis-section-timeseries');
     const pmParams = AUDIT_PARAMETERS.filter(p => p.hasTimeSeries);
     el.innerHTML = `
-        <h3 class="analysis-section-heading">PM Time Series</h3>
+        <h3 class="analysis-section-heading">PM Timeseries</h3>
         <div class="analysis-chart-grid">
         ${pmParams.map(p => `<div class="analysis-chart-card">
             <div class="chart-title-editable" onclick="editChartTitle(this)">${parsed.sensorB.short} and ${parsed.sensorA.short} \u2014 ${p.labelHtml}</div>
@@ -5972,7 +5972,7 @@ function generateAuditReport(auditId) {
 
         const renderChartToImage = (config) => {
             const canvas = document.createElement('canvas');
-            canvas.width = 880; canvas.height = 480;
+            canvas.width = 1200; canvas.height = 600;
             tempContainer.appendChild(canvas);
             const chart = new Chart(canvas, config);
             const img = canvas.toDataURL('image/png');
@@ -6053,29 +6053,31 @@ function generateAuditReport(auditId) {
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'DM Sans', sans-serif; color: #1e293b; padding: 40px 48px; max-width: 1000px; margin: 0 auto; line-height: 1.5; }
-    h1 { font-size: 22px; color: #1B2A4A; margin-bottom: 4px; }
+    h1 { font-size: 26px; color: #1B2A4A; margin-bottom: 2px; }
     h2 { font-size: 16px; color: #1B2A4A; margin: 28px 0 12px; border-bottom: 2px solid #1B2A4A; padding-bottom: 6px; }
     sub { font-size: 0.8em; }
-    .report-subtitle { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+    .report-subtitle { font-size: 14px; color: #64748b; margin-bottom: 4px; line-height: 1.6; }
+    .report-sensors { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #475569; margin-bottom: 20px; }
     .report-header-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; border-bottom: 3px solid #C9A84C; padding-bottom: 16px; }
-    .report-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 32px; font-size: 13px; margin-bottom: 20px; }
-    .report-meta dt { font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .report-meta dd { margin: 0 0 8px; color: #1e293b; }
+    .report-meta { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 6px 16px; font-size: 13px; margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; }
+    .report-meta dt { font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+    .report-meta dd { margin: 0; color: #1e293b; padding-bottom: 6px; border-bottom: 1px solid #f1f5f9; }
+    .report-meta dd:last-child, .report-meta dd:nth-last-child(2) { border-bottom: none; }
     .report-meta dd .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-    .trim-note { display: inline-block; background: #fff8e8; color: #8a6d20; padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 12px; }
-    .dqo-thresh { display: block; font-size: 9px; font-weight: 400; text-transform: none; letter-spacing: 0; color: #94a3b8; }
-    table.dqo { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
-    table.dqo th { text-align: right; padding: 10px 14px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    .trim-note { display: inline-block; background: #fff8e8; color: #8a6d20; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+    .dqo-thresh { display: block; font-size: 10px; font-weight: 500; text-transform: none; letter-spacing: 0; color: #64748b; margin-top: 1px; }
+    table.dqo { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+    table.dqo th { text-align: right; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #475569; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
     table.dqo th:first-child { text-align: left; }
     table.dqo th:last-child { text-align: center; }
-    table.dqo td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+    table.dqo td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
     table.dqo td:first-child { text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 600; }
     table.dqo td:last-child { text-align: center; }
     table.dqo tbody tr:nth-child(even) { background: #fafbfc; }
-    .thresholds { font-size: 10px; color: #94a3b8; margin-top: 6px; }
-    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
-    .chart-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; page-break-inside: avoid; }
-    .chart-card h4 { font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 8px; }
+    .thresholds { font-size: 13px; color: #475569; margin-top: 10px; line-height: 1.6; }
+    .chart-grid { display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 12px; }
+    .chart-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; page-break-inside: avoid; }
+    .chart-card h4 { font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 10px; }
     .chart-card img { width: 100%; display: block; }
     .report-footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
     @media print {
@@ -6089,12 +6091,13 @@ function generateAuditReport(auditId) {
 
     <div class="report-header-bar">
         <div>
-            <h1>Sensor Collocation Audit Report</h1>
-            <div class="report-subtitle">${escapeHtml(communityName)} \u2014 ${dateRange}</div>
+            <h1>${escapeHtml(communityName)} Sensor Audit Report</h1>
+            <div class="report-subtitle">${dateRange}</div>
+            <div class="report-sensors">${escapeHtml(labelB)} and ${escapeHtml(labelA)}</div>
         </div>
-        <div style="text-align:right;font-size:11px;color:#64748b">
-            <div>Alaska Dept. of Environmental Conservation</div>
-            <div>Air Quality Division</div>
+        <div style="text-align:right;font-size:11px;color:#64748b;line-height:1.6">
+            <div style="font-weight:600">ADEC Division of Air Quality</div>
+            <div>Air Monitoring and Quality Assurance</div>
             <div style="margin-top:4px">${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
         </div>
     </div>
@@ -6103,13 +6106,11 @@ function generateAuditReport(auditId) {
     <dl class="report-meta">
         <dt>Community</dt><dd>${escapeHtml(communityName)}</dd>
         <dt>Audit Period</dt><dd>${dateRange}</dd>
-        <dt>Audit Pod</dt><dd><span class="mono">${escapeHtml(labelA)}</span></dd>
         <dt>Community Pod</dt><dd><span class="mono">${escapeHtml(labelB)}</span></dd>
-        <dt>Audit Pod Location</dt><dd>${escapeHtml(auditPodSensor?.location || '\u2014')}</dd>
+        <dt>Audit Pod</dt><dd><span class="mono">${escapeHtml(labelA)}</span></dd>
         <dt>Community Pod Location</dt><dd>${escapeHtml(communityPodSensor?.location || '\u2014')}</dd>
-        <dt>Conducted By</dt><dd>${escapeHtml(audit.conductedBy || '\u2014')}</dd>
-        <dt>Analysis Date</dt><dd>${audit.analysisUploadDate ? new Date(audit.analysisUploadDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '\u2014'}${audit.analysisUploadedBy ? ' by ' + escapeHtml(audit.analysisUploadedBy) : ''}</dd>
-        ${audit.notes ? `<dt>Notes</dt><dd style="grid-column:span 2">${escapeHtml(audit.notes)}</dd>` : ''}
+        <dt>Installation / Removal By</dt><dd>${escapeHtml(audit.conductedBy || '\u2014')}</dd>
+        ${audit.notes ? `<dt>Notes</dt><dd style="grid-column:span 3">${escapeHtml(audit.notes)}</dd>` : ''}
     </dl>
 
     <h2>Data Quality Objectives (DQO) Summary</h2>
@@ -6127,9 +6128,9 @@ function generateAuditReport(auditId) {
         </tr></thead>
         <tbody>${dqoRows}</tbody>
     </table>
-    <div class="thresholds">Intercept, SD, and RMSE in parameter units (ppb for gases, \u00B5g/m\u00B3 for PM). PM<sub>10</sub> values &gt; 1000 \u00B5g/m\u00B3 invalidated.</div>
+    <div class="thresholds">Intercept, SD, and RMSE are expressed in the units of the measured parameter (ppb for gases, \u00B5g/m\u00B3 for particulate matter). PM<sub>10</sub> values exceeding 1000 \u00B5g/m\u00B3 were invalidated prior to analysis.</div>
 
-    ${tsHtml ? `<h2>PM Time Series</h2><div class="chart-grid">${tsHtml}</div>` : ''}
+    ${tsHtml ? `<h2>PM Timeseries</h2><div class="chart-grid">${tsHtml}</div>` : ''}
 
     <div style="page-break-before:always"></div>
     <h2>Regression Plots</h2>
