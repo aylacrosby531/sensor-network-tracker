@@ -400,6 +400,30 @@
                 </div>
 
                 <div class="settings-section">
+                    <h3 class="settings-section-title">Change Password</h3>
+                    <div class="settings-card" id="settings-password">
+                        <form id="change-password-form" onsubmit="changePassword(event)" autocomplete="off">
+                            <div id="pw-step-passwords">
+                                <div class="form-group"><label>Current Password</label><input type="password" id="pw-current" required autocomplete="current-password"></div>
+                                <div class="form-group"><label>New Password</label><input type="password" id="pw-new" required autocomplete="new-password"></div>
+                                <div class="form-group"><label>Confirm New Password</label><input type="password" id="pw-confirm" required autocomplete="new-password"></div>
+                                <p class="settings-description" style="margin-top:0">Must be at least 8 characters with a letter, number, and symbol.</p>
+                            </div>
+                            <div id="pw-step-mfa" style="display:none">
+                                <div style="background:var(--slate-50);border:1px solid var(--slate-200);border-radius:8px;padding:16px 20px;margin-bottom:16px">
+                                    <p style="font-size:14px;font-weight:600;color:var(--navy-500);margin-bottom:6px">Confirm with your authenticator</p>
+                                    <p style="font-size:13px;color:var(--slate-500);margin-bottom:12px">Enter the 6-digit code from your authenticator app to confirm the password change.</p>
+                                    <input type="text" id="pw-mfa-code" maxlength="6" placeholder="000000" autocomplete="one-time-code" style="text-align:center;font-family:var(--font-mono);font-size:20px;letter-spacing:6px;padding:10px;width:160px">
+                                </div>
+                            </div>
+                            <div id="pw-error" class="login-error" role="alert"></div>
+                            <div id="pw-success" style="display:none;color:#16a34a;font-size:13px;font-weight:600;margin-bottom:8px"></div>
+                            <button type="submit" class="btn btn-primary" id="pw-submit-btn">Update Password</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h3 class="settings-section-title">Multi-Factor Authentication</h3>
                     <div id="settings-mfa"></div>
                 </div>
@@ -1071,6 +1095,21 @@
             <div class="modal-footer">
                 <button type="button" class="btn" onclick="closeModal('modal-close-ticket')">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="confirmCloseTicket()">Close Ticket</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation / Alert Modal -->
+    <div id="modal-confirm" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2 id="modal-confirm-title">Confirm</h2>
+                <button class="modal-close" aria-label="Close dialog" onclick="dismissConfirmModal()">&times;</button>
+            </div>
+            <div id="modal-confirm-body" class="modal-confirm-body"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn" id="modal-confirm-cancel" onclick="dismissConfirmModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="modal-confirm-ok" onclick="acceptConfirmModal()">Confirm</button>
             </div>
         </div>
     </div>

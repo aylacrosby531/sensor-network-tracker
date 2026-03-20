@@ -4215,3 +4215,28 @@ th:hover .field-reorder-btns {
     .dqo-overall, .dqo-pass, .dqo-fail, .audit-param-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @page { margin: 0.5in; }
 }
+
+/* ===== CONFIRM / ALERT MODAL ===== */
+.modal-confirm-body {
+    padding: 16px 28px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--slate-700);
+}
+
+#modal-confirm .modal-footer {
+    padding: 12px 28px 20px;
+}
+
+#modal-confirm .btn-confirm-danger {
+    background: linear-gradient(135deg, #e11d48, #be123c);
+    color: #fff;
+    border: none;
+    box-shadow: 0 1px 3px rgba(225, 29, 72, 0.3);
+}
+
+#modal-confirm .btn-confirm-danger:hover {
+    background: linear-gradient(135deg, #f43f5e, #e11d48);
+    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+    transform: translateY(-1px);
+}

@@ -15,6 +15,63 @@ let communityParents = {}; // childId -> parentId
 let currentUserRole = 'user'; // 'admin' or 'user' — loaded from profile on login
 let mfaRequired = true; // global setting, admin-configurable
 
+// ===== CUSTOM CONFIRM / ALERT MODAL =====
+let _confirmCallback = null;
+let _confirmDismissCallback = null;
+
+function showConfirm(title, message, onConfirm, options = {}) {
+    const modal = document.getElementById('modal-confirm');
+    document.getElementById('modal-confirm-title').textContent = title;
+    document.getElementById('modal-confirm-body').innerHTML = message;
+    const okBtn = document.getElementById('modal-confirm-ok');
+    const cancelBtn = document.getElementById('modal-confirm-cancel');
+    okBtn.textContent = options.confirmText || 'Confirm';
+    cancelBtn.textContent = options.cancelText || 'Cancel';
+    cancelBtn.style.display = '';
+    if (options.danger) {
+        okBtn.className = 'btn btn-confirm-danger';
+    } else {
+        okBtn.className = 'btn btn-primary';
+    }
+    _confirmCallback = onConfirm;
+    _confirmDismissCallback = null;
+    modal.classList.add('open');
+}
+
+function showAlert(title, message, onDismiss) {
+    const modal = document.getElementById('modal-confirm');
+    document.getElementById('modal-confirm-title').textContent = title;
+    document.getElementById('modal-confirm-body').innerHTML = message;
+    const okBtn = document.getElementById('modal-confirm-ok');
+    const cancelBtn = document.getElementById('modal-confirm-cancel');
+    okBtn.textContent = 'OK';
+    okBtn.className = 'btn btn-primary';
+    cancelBtn.style.display = 'none';
+    _confirmCallback = onDismiss || null;
+    _confirmDismissCallback = null;
+    modal.classList.add('open');
+}
+
+function acceptConfirmModal() {
+    const modal = document.getElementById('modal-confirm');
+    modal.classList.remove('open');
+    if (_confirmCallback) { const cb = _confirmCallback; _confirmCallback = null; _confirmDismissCallback = null; cb(); }
+}
+
+function dismissConfirmModal() {
+    const modal = document.getElementById('modal-confirm');
+    modal.classList.remove('open');
+    if (_confirmDismissCallback) { const cb = _confirmDismissCallback; _confirmCallback = null; _confirmDismissCallback = null; cb(); }
+    _confirmCallback = null;
+    _confirmDismissCallback = null;
+}
+
+// Close confirm modal on backdrop click
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('modal-confirm');
+    if (modal && e.target === modal) dismissConfirmModal();
+});
+
 function loadData(key, fallback) {
     try {
         const raw = localStorage.getItem('snt_' + key);
@@ -298,23 +355,27 @@ async function handleSignIn() {
 }
 
 async function checkMfaAndProceed() {
-    // Check if MFA is required globally
+    // Check if MFA is enforced for login challenges
     let mfaOn = true;
     try { const setting = await db.getAppSetting('mfa_required'); mfaOn = setting !== 'false'; } catch(e) { mfaOn = true; }
-
-    if (!mfaOn) {
-        // MFA disabled — go straight to app
-        await enterApp();
-        return;
-    }
 
     const { data: factors } = await supa.auth.mfa.listFactors();
     const totp = factors?.totp?.find(f => f.status === 'verified');
 
-    if (totp) {
+    if (!totp) {
+        // No MFA factor set up — ALWAYS require enrollment for new users
+        // regardless of app toggle, so they can change passwords and are
+        // ready if an admin enables enforcement later
+        showMfaSetup();
+        return;
+    }
+
+    if (mfaOn) {
+        // MFA enforced — require code on every login
         showMfaChallenge();
     } else {
-        showMfaSetup();
+        // MFA not enforced — user has a factor but skip the challenge
+        await enterApp();
     }
 }
 
@@ -390,8 +451,9 @@ async function handleSignUp() {
     try {
         await db.signUp(email, password, name);
         hideLoginError();
-        alert('Account created! Check your email to confirm, then sign in.');
-        showSignInForm();
+        showAlert('Account Created', 'Account created! Check your email to confirm, then sign in.', () => {
+            showSignInForm();
+        });
     } catch (err) {
         showLoginError(err.message || 'Sign up failed. Your email may not be authorized.');
     }
@@ -485,8 +547,9 @@ function resetInactivityTimer() {
     inactivityTimeout = setTimeout(async () => {
         sessionStorage.removeItem('mfa_verified_at');
         sessionStorage.removeItem('mfa_verified_user');
-        alert('You have been signed out due to inactivity.');
-        await logoutUser();
+        showAlert('Session Expired', 'You have been signed out due to inactivity.', async () => {
+            await logoutUser();
+        });
     }, INACTIVITY_LIMIT);
 }
 
@@ -1106,29 +1169,35 @@ function hideOrDeleteColumn(key) {
         const cfKey = key.replace('custom_', '');
         const cf = customSensorFields.find(f => f.key === cfKey);
         if (!cf) return;
-        if (!confirm(`Permanently delete "${cf.label}"? This removes the field and all its data from every sensor. This cannot be undone.`)) return;
-        customSensorFields = customSensorFields.filter(f => f.key !== cfKey);
-        saveData('customSensorFields', customSensorFields);
-        sensors.forEach(s => { if (s.customFields) delete s.customFields[cfKey]; });
-        saveCustomFieldData();
+        showConfirm('Delete Field', `Permanently delete "${cf.label}"? This removes the field and all its data from every sensor. This cannot be undone.`, () => {
+            customSensorFields = customSensorFields.filter(f => f.key !== cfKey);
+            saveData('customSensorFields', customSensorFields);
+            sensors.forEach(s => { if (s.customFields) delete s.customFields[cfKey]; });
+            saveCustomFieldData();
+            renderSensorTableHeader();
+            renderSensors();
+            if (currentSensor) showSensorView(currentSensor);
+        }, { danger: true });
     } else {
         const col = ALL_SENSOR_COLUMNS.find(c => c.key === key);
-        if (!confirm(`Hide "${col?.label || key}" column? You can restore it later in setup mode.`)) return;
-        hiddenColumns.push(key);
-        saveData('hiddenSensorColumns', hiddenColumns);
+        showConfirm('Hide Column', `Hide "${col?.label || key}" column? You can restore it later in setup mode.`, () => {
+            hiddenColumns.push(key);
+            saveData('hiddenSensorColumns', hiddenColumns);
+            renderSensorTableHeader();
+            renderSensors();
+            if (currentSensor) showSensorView(currentSensor);
+        });
     }
-    renderSensorTableHeader();
-    renderSensors();
-    if (currentSensor) showSensorView(currentSensor);
 }
 
 function restoreHiddenColumns() {
     const names = hiddenColumns.map(key => ALL_SENSOR_COLUMNS.find(c => c.key === key)?.label || key).join(', ');
-    if (!confirm(`Restore hidden columns: ${names}?`)) return;
-    hiddenColumns = [];
-    saveData('hiddenSensorColumns', hiddenColumns);
-    renderSensorTableHeader();
-    renderSensors();
+    showConfirm('Restore Columns', `Restore hidden columns: ${names}?`, () => {
+        hiddenColumns = [];
+        saveData('hiddenSensorColumns', hiddenColumns);
+        renderSensorTableHeader();
+        renderSensors();
+    });
 }
 
 function moveColumn(currentIndex, direction) {
@@ -1423,7 +1492,7 @@ function saveSensor(e) {
         }
     } else {
         if (sensors.find(s => s.id === data.id)) {
-            alert('A sensor with that ID already exists.');
+            showAlert('Duplicate Sensor', 'A sensor with that ID already exists.');
             return;
         }
         sensors.push(data);
@@ -1983,7 +2052,7 @@ async function handleFileUpload(event) {
             renderCommunityFiles(currentCommunity);
         } catch (err) {
             console.error('Upload error:', err);
-            alert('File upload failed: ' + err.message);
+            showAlert('Error', 'File upload failed: ' + err.message);
         }
     }
 
@@ -2110,15 +2179,16 @@ async function downloadStorageFile(storagePath, fileName) {
 }
 
 async function deleteFile(communityId, fileId, storagePath) {
-    if (!confirm('Delete this file?')) return;
-    try {
-        await db.deleteFile(fileId, storagePath);
-        communityFiles[communityId] = (communityFiles[communityId] || []).filter(f => f.id !== fileId);
-        renderCommunityFiles(communityId);
-    } catch (err) {
-        console.error('Delete error:', err);
-        alert('Delete failed: ' + err.message);
-    }
+    showConfirm('Delete File', 'Delete this file? This cannot be undone.', async () => {
+        try {
+            await db.deleteFile(fileId, storagePath);
+            communityFiles[communityId] = (communityFiles[communityId] || []).filter(f => f.id !== fileId);
+            renderCommunityFiles(communityId);
+        } catch (err) {
+            console.error('Delete error:', err);
+            showAlert('Error', 'Delete failed: ' + err.message);
+        }
+    }, { danger: true });
 }
 
 // ===== CONTACTS =====
@@ -2197,7 +2267,7 @@ async function saveContact(e) {
     const isActive = document.getElementById('contact-active-yes').checked;
     const emailVal = document.getElementById('contact-email-input').value.trim();
     if (emailVal && !emailVal.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-        alert('Please enter a valid email address.');
+        showAlert('Validation Error', 'Please enter a valid email address.');
         return;
     }
 
@@ -2451,20 +2521,20 @@ function deleteCurrentContact() {
     if (!currentContact) return;
     const c = contacts.find(x => x.id === currentContact);
     if (!c) return;
-    if (!confirm(`Delete contact "${c.name}"? This cannot be undone.`)) return;
+    showConfirm('Delete Contact', `Delete contact "${c.name}"? This cannot be undone.`, () => {
+        db.deleteContact(currentContact).catch(err => console.error('Delete error:', err));
+        contacts = contacts.filter(x => x.id !== currentContact);
+        closeModal('modal-add-contact'); showSuccessToast('Contact deleted');
 
-    db.deleteContact(currentContact).catch(err => console.error('Delete error:', err));
-    contacts = contacts.filter(x => x.id !== currentContact);
-    closeModal('modal-add-contact'); showSuccessToast('Contact saved');
-
-    // Close the tab and go to contacts list
-    const tabId = getTabId('contact', currentContact);
-    const tabIdx = openTabs.findIndex(t => t.id === tabId);
-    if (tabIdx >= 0) openTabs.splice(tabIdx, 1);
-    activeTabId = null;
-    renderOpenTabs();
-    currentContact = null;
-    showView('contacts');
+        // Close the tab and go to contacts list
+        const tabId = getTabId('contact', currentContact);
+        const tabIdx = openTabs.findIndex(t => t.id === tabId);
+        if (tabIdx >= 0) openTabs.splice(tabIdx, 1);
+        activeTabId = null;
+        renderOpenTabs();
+        currentContact = null;
+        showView('contacts');
+    }, { danger: true });
 }
 
 function openContactCommModal() {
@@ -2571,12 +2641,12 @@ function sendEmail() {
     const emails = selectedContacts.map(c => c.email).filter(Boolean);
 
     if (emails.length === 0) {
-        alert('No contacts with email addresses are selected.');
+        showAlert('No Recipients', 'No contacts with email addresses are selected.');
         return;
     }
 
     if (!subject || !body) {
-        alert('Please enter both a subject and body before sending.');
+        showAlert('Validation Error', 'Please enter both a subject and body before sending.');
         return;
     }
 
@@ -2899,21 +2969,22 @@ function editTimelineItem(id, isNote) {
 }
 
 async function deleteTimelineItem(id, isNote) {
-    if (!confirm('Are you sure? Only delete events that were created by accident.')) return;
-    try {
-        if (isNote) {
-            notes = notes.filter(n => n.id !== id);
-            await supa.from('note_tags').delete().eq('note_id', id);
-            await supa.from('notes').delete().eq('id', id);
-        } else {
-            comms = comms.filter(c => c.id !== id);
-            await supa.from('comm_tags').delete().eq('comm_id', id);
-            await supa.from('comms').delete().eq('id', id);
+    showConfirm('Delete Event', 'Are you sure? Only delete events that were created by accident.', async () => {
+        try {
+            if (isNote) {
+                notes = notes.filter(n => n.id !== id);
+                await supa.from('note_tags').delete().eq('note_id', id);
+                await supa.from('notes').delete().eq('id', id);
+            } else {
+                comms = comms.filter(c => c.id !== id);
+                await supa.from('comm_tags').delete().eq('comm_id', id);
+                await supa.from('comms').delete().eq('id', id);
+            }
+        } catch (err) {
+            console.error('Delete error:', err);
         }
-    } catch (err) {
-        console.error('Delete error:', err);
-    }
-    refreshCurrentView();
+        refreshCurrentView();
+    }, { danger: true });
 }
 
 function refreshCurrentView() {
@@ -3172,7 +3243,7 @@ function saveCommunity(e) {
 
     // Check for duplicates
     if (COMMUNITIES.find(c => c.id === id)) {
-        alert('A community with that name already exists.');
+        showAlert('Duplicate Community', 'A community with that name already exists.');
         return;
     }
 
@@ -3650,7 +3721,7 @@ async function renderAllowedUsers(currentEmail) {
 }
 
 async function addAllowedEmail() {
-    if (currentUserRole !== 'admin') { alert('Only admins can add users.'); return; }
+    if (currentUserRole !== 'admin') { showAlert('Access Denied', 'Only admins can add users.'); return; }
     const input = document.getElementById('settings-add-email');
     const roleSelect = document.getElementById('settings-add-role');
     const email = input.value.trim().toLowerCase();
@@ -3663,7 +3734,7 @@ async function addAllowedEmail() {
     } else {
         const { error } = await supa.from('allowed_emails').insert({ email, status: 'active', role });
         if (error) {
-            alert(error.message.includes('duplicate') ? 'That email is already added.' : error.message);
+            showAlert('Error', error.message.includes('duplicate') ? 'That email is already added.' : error.message);
             return;
         }
     }
@@ -3675,73 +3746,56 @@ async function addAllowedEmail() {
 }
 
 async function archiveUser(id) {
-    if (currentUserRole !== 'admin') { alert('Only admins can archive users.'); return; }
-    if (!confirm('Archive this user? They will no longer be able to sign in, but their history and edits will be preserved. You can reactivate them later.')) return;
+    if (currentUserRole !== 'admin') { showAlert('Access Denied', 'Only admins can archive users.'); return; }
+    showConfirm('Archive User', 'Archive this user? They will no longer be able to sign in, but their history and edits will be preserved. You can reactivate them later.', async () => {
+        const { error } = await supa.from('allowed_emails').update({ status: 'archived' }).eq('id', id);
+        if (error) { showAlert('Error', error.message); return; }
 
-    const { error } = await supa.from('allowed_emails').update({ status: 'archived' }).eq('id', id);
-    if (error) { alert(error.message); return; }
-
-    const session = await db.getSession();
-    await renderAllowedUsers(session?.user?.email || '');
+        const session = await db.getSession();
+        await renderAllowedUsers(session?.user?.email || '');
+    });
 }
 
 async function reactivateUser(id) {
-    if (currentUserRole !== 'admin') { alert('Only admins can reactivate users.'); return; }
+    if (currentUserRole !== 'admin') { showAlert('Access Denied', 'Only admins can reactivate users.'); return; }
     const { error } = await supa.from('allowed_emails').update({ status: 'active' }).eq('id', id);
-    if (error) { alert(error.message); return; }
+    if (error) { showAlert('Error', error.message); return; }
 
     const session = await db.getSession();
     await renderAllowedUsers(session?.user?.email || '');
 }
 
 async function permanentlyDeleteUser(id, email) {
-    if (currentUserRole !== 'admin') { alert('Only admins can delete users.'); return; }
+    if (currentUserRole !== 'admin') { showAlert('Access Denied', 'Only admins can delete users.'); return; }
 
     // First warning — recommend archiving instead
-    const firstConfirm = confirm(
-        'Are you sure you want to permanently delete this user?\n\n' +
-        'If this user has simply become inactive, you should ARCHIVE them instead. ' +
-        'Archiving preserves their account so it can be reactivated later.\n\n' +
-        'Click OK to proceed with permanent deletion, or Cancel to go back.'
-    );
-    if (!firstConfirm) return;
+    showConfirm('Delete User', 'Are you sure you want to permanently delete this user?<br><br>If this user has simply become inactive, you should <strong>archive</strong> them instead. Archiving preserves their account so it can be reactivated later.', () => {
+        // Second warning — final confirmation
+        showConfirm('Final Warning', 'This action cannot be undone!<br><br>Permanently deleting <strong>"' + email + '"</strong> will:<br>&bull; Remove their account entirely<br>&bull; Change all their past edits and notes to show "[Deleted User]"<br><br>Are you absolutely sure you want to delete this user?', async () => {
+            try {
+                const { data: profileRow } = await supa.from('profiles').select('id').eq('email', email).single();
+                if (profileRow) {
+                    await supa.from('profiles').update({ name: '[Deleted User]', email: '' }).eq('id', profileRow.id);
+                }
 
-    // Second warning — final confirmation
-    const secondConfirm = confirm(
-        'FINAL WARNING: This action cannot be undone!\n\n' +
-        'Permanently deleting "' + email + '" will:\n' +
-        '  - Remove their account entirely\n' +
-        '  - Change all their past edits and notes to show "[Deleted User]"\n\n' +
-        'Are you absolutely sure you want to delete this user?'
-    );
-    if (!secondConfirm) return;
+                await supa.from('allowed_emails').delete().eq('id', id);
 
-    try {
-        // Update the user's profile name to "[Deleted User]" so all past
-        // notes, comms, audits, and tickets show the anonymized name
-        const { data: profileRow } = await supa.from('profiles').select('id').eq('email', email).single();
-        if (profileRow) {
-            await supa.from('profiles').update({ name: '[Deleted User]', email: '' }).eq('id', profileRow.id);
-        }
+                notes.forEach(n => { if (profileRow && n.createdById === profileRow.id) n.createdBy = '[Deleted User]'; });
+                comms.forEach(c => { if (profileRow && c.createdById === profileRow.id) c.createdBy = '[Deleted User]'; });
 
-        // Remove from allowed emails
-        await supa.from('allowed_emails').delete().eq('id', id);
-
-        // Update in-memory data to reflect the change immediately
-        notes.forEach(n => { if (profileRow && n.createdById === profileRow.id) n.createdBy = '[Deleted User]'; });
-        comms.forEach(c => { if (profileRow && c.createdById === profileRow.id) c.createdBy = '[Deleted User]'; });
-
-        const session = await db.getSession();
-        await renderAllowedUsers(session?.user?.email || '');
-    } catch (err) {
-        alert('Failed to delete user: ' + err.message);
-    }
+                const session = await db.getSession();
+                await renderAllowedUsers(session?.user?.email || '');
+            } catch (err) {
+                showAlert('Error', 'Failed to delete user: ' + err.message);
+            }
+        }, { danger: true, confirmText: 'Delete Permanently' });
+    }, { danger: true, confirmText: 'Continue' });
 }
 
 async function changeUserRole(id, newRole) {
-    if (currentUserRole !== 'admin') { alert('Only admins can change roles.'); return; }
+    if (currentUserRole !== 'admin') { showAlert('Access Denied', 'Only admins can change roles.'); return; }
     const { error } = await supa.from('allowed_emails').update({ role: newRole }).eq('id', id);
-    if (error) { alert(error.message); return; }
+    if (error) { showAlert('Error', error.message); return; }
 
     // Also update the profile if the user has one
     const { data: emailRow } = await supa.from('allowed_emails').select('email').eq('id', id).single();
@@ -3754,15 +3808,134 @@ async function changeUserRole(id, newRole) {
 }
 
 async function toggleMfaRequirement(enabled) {
-    if (currentUserRole !== 'admin') { alert('Only admins can change MFA settings.'); return; }
+    if (currentUserRole !== 'admin') { showAlert('Access Denied', 'Only admins can change MFA settings.'); return; }
     try {
         await db.setAppSetting('mfa_required', enabled ? 'true' : 'false');
         mfaRequired = enabled;
         const session = await db.getSession();
         await renderAllowedUsers(session?.user?.email || '');
     } catch (err) {
-        alert('Failed to update MFA setting: ' + err.message);
+        showAlert('Error', 'Failed to update MFA setting: ' + err.message);
     }
+}
+
+// ===== CHANGE PASSWORD =====
+let _pwPendingNewPassword = null;
+let _pwPendingFactorId = null;
+
+async function changePassword(event) {
+    event.preventDefault();
+    const errorEl = document.getElementById('pw-error');
+    const successEl = document.getElementById('pw-success');
+    const btn = document.getElementById('pw-submit-btn');
+    const stepPasswords = document.getElementById('pw-step-passwords');
+    const stepMfa = document.getElementById('pw-step-mfa');
+    errorEl.textContent = '';
+    errorEl.classList.remove('visible');
+    successEl.style.display = 'none';
+
+    // Step 2: MFA verification — user is submitting the code
+    if (_pwPendingNewPassword) {
+        const mfaCode = document.getElementById('pw-mfa-code').value.trim();
+        if (!mfaCode || mfaCode.length !== 6) {
+            errorEl.textContent = 'Please enter your 6-digit code.';
+            errorEl.classList.add('visible');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Verifying...';
+
+        try {
+            const { data: challenge, error: challengeErr } = await supa.auth.mfa.challenge({ factorId: _pwPendingFactorId });
+            if (challengeErr) { errorEl.textContent = challengeErr.message; errorEl.classList.add('visible'); return; }
+            const { error: verifyErr } = await supa.auth.mfa.verify({ factorId: _pwPendingFactorId, challengeId: challenge.id, code: mfaCode });
+            if (verifyErr) {
+                errorEl.textContent = 'Invalid code. Please try again.';
+                errorEl.classList.add('visible');
+                document.getElementById('pw-mfa-code').value = '';
+                document.getElementById('pw-mfa-code').focus();
+                return;
+            }
+
+            const { error: updateErr } = await supa.auth.updateUser({ password: _pwPendingNewPassword });
+            if (updateErr) { errorEl.textContent = updateErr.message; errorEl.classList.add('visible'); return; }
+
+            // Success — reset everything
+            resetPasswordForm();
+            successEl.textContent = 'Password updated successfully.';
+            successEl.style.display = 'block';
+            setTimeout(() => { successEl.style.display = 'none'; }, 5000);
+        } catch (err) {
+            errorEl.textContent = err.message || 'Failed to update password.';
+            errorEl.classList.add('visible');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Confirm & Update Password';
+        }
+        return;
+    }
+
+    // Step 1: Validate passwords
+    const currentPw = document.getElementById('pw-current').value;
+    const newPw = document.getElementById('pw-new').value;
+    const confirmPw = document.getElementById('pw-confirm').value;
+
+    if (newPw !== confirmPw) { errorEl.textContent = 'New passwords do not match.'; errorEl.classList.add('visible'); return; }
+    if (newPw.length < 8) { errorEl.textContent = 'Password must be at least 8 characters.'; errorEl.classList.add('visible'); return; }
+    if (!/[a-zA-Z]/.test(newPw)) { errorEl.textContent = 'Password must include at least one letter.'; errorEl.classList.add('visible'); return; }
+    if (!/[0-9]/.test(newPw)) { errorEl.textContent = 'Password must include at least one number.'; errorEl.classList.add('visible'); return; }
+    if (!/[^a-zA-Z0-9]/.test(newPw)) { errorEl.textContent = 'Password must include at least one symbol (e.g. !@#$%).'; errorEl.classList.add('visible'); return; }
+    if (newPw === currentPw) { errorEl.textContent = 'New password must be different from current password.'; errorEl.classList.add('visible'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
+    try {
+        // Check if MFA verification is needed (Supabase requires AAL2 if account has a verified factor)
+        const { data: factors } = await supa.auth.mfa.listFactors();
+        const totp = factors?.totp?.find(f => f.status === 'verified');
+
+        if (totp) {
+            // Show MFA step, hide password fields
+            _pwPendingNewPassword = newPw;
+            _pwPendingFactorId = totp.id;
+            stepPasswords.style.display = 'none';
+            stepMfa.style.display = '';
+            btn.textContent = 'Confirm & Update Password';
+            btn.disabled = false;
+            document.getElementById('pw-mfa-code').value = '';
+            document.getElementById('pw-mfa-code').focus();
+            return;
+        }
+
+        // No MFA — update directly
+        const { error: updateErr } = await supa.auth.updateUser({ password: newPw });
+        if (updateErr) { errorEl.textContent = updateErr.message; errorEl.classList.add('visible'); return; }
+
+        resetPasswordForm();
+        successEl.textContent = 'Password updated successfully.';
+        successEl.style.display = 'block';
+        setTimeout(() => { successEl.style.display = 'none'; }, 5000);
+    } catch (err) {
+        errorEl.textContent = err.message || 'Failed to update password.';
+        errorEl.classList.add('visible');
+    } finally {
+        btn.disabled = false;
+        if (!_pwPendingNewPassword) btn.textContent = 'Update Password';
+    }
+}
+
+function resetPasswordForm() {
+    _pwPendingNewPassword = null;
+    _pwPendingFactorId = null;
+    document.getElementById('pw-current').value = '';
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-confirm').value = '';
+    document.getElementById('pw-mfa-code').value = '';
+    document.getElementById('pw-step-passwords').style.display = '';
+    document.getElementById('pw-step-mfa').style.display = 'none';
+    document.getElementById('pw-submit-btn').textContent = 'Update Password';
 }
 
 // ===== MFA =====
@@ -3780,7 +3953,7 @@ async function renderMfaSettings() {
 
 async function startMfaSetup() {
     const { data, error } = await supa.auth.mfa.enroll({ factorType: 'totp' });
-    if (error) { alert(error.message); return; }
+    if (error) { showAlert('Error', error.message); return; }
 
     const area = document.getElementById('mfa-setup-area');
     area.innerHTML = `
@@ -3800,21 +3973,22 @@ async function startMfaSetup() {
 
 async function verifyMfa(factorId) {
     const code = document.getElementById('mfa-verify-code').value.trim();
-    if (!code || code.length !== 6) { alert('Enter the 6-digit code from your authenticator app.'); return; }
+    if (!code || code.length !== 6) { showAlert('Validation Error', 'Enter the 6-digit code from your authenticator app.'); return; }
 
     const { data: challenge } = await supa.auth.mfa.challenge({ factorId });
     const { error } = await supa.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
 
-    if (error) { alert('Invalid code. Try again.'); return; }
-    alert('MFA enabled successfully!');
+    if (error) { showAlert('Error', 'Invalid code. Try again.'); return; }
+    showAlert('Success', 'MFA enabled successfully!');
     await renderMfaSettings();
 }
 
 async function disableMfa(factorId) {
-    if (!confirm('Disable MFA? Your account will only be protected by your password.')) return;
-    const { error } = await supa.auth.mfa.unenroll({ factorId });
-    if (error) { alert(error.message); return; }
-    await renderMfaSettings();
+    showConfirm('Disable MFA', 'Disable MFA? Your account will only be protected by your password.', async () => {
+        const { error } = await supa.auth.mfa.unenroll({ factorId });
+        if (error) { showAlert('Error', error.message); return; }
+        await renderMfaSettings();
+    });
 }
 
 // ===== SENSOR TAGS & SIDEBAR =====
@@ -4098,7 +4272,7 @@ function toggleBulkFields() {
 function executeBulkAction() {
     const doMove = document.getElementById('bulk-do-move').checked;
     const doStatus = document.getElementById('bulk-do-status').checked;
-    if (!doMove && !doStatus) { alert('Select at least one action.'); return; }
+    if (!doMove && !doStatus) { showAlert('Validation Error', 'Select at least one action.'); return; }
 
     const userNotes = document.getElementById('bulk-action-notes').value.trim();
     const eventDate = document.getElementById('bulk-action-date').value || nowDatetime();
@@ -4112,13 +4286,13 @@ function executeBulkAction() {
 
     if (doMove) {
         toCommunityId = document.getElementById('bulk-move-community').value;
-        if (!toCommunityId) { alert('Select a community.'); return; }
+        if (!toCommunityId) { showAlert('Validation Error', 'Select a community.'); return; }
         toName = getCommunityName(toCommunityId);
     }
 
     if (doStatus) {
         newStatuses = getSelectedStatuses('bulk-status-list');
-        if (newStatuses.length === 0) { alert('Select at least one status.'); return; }
+        if (newStatuses.length === 0) { showAlert('Validation Error', 'Select at least one status.'); return; }
     }
 
     const sourceCommunities = new Set();
@@ -4250,7 +4424,7 @@ function saveCollocation(e) {
     const endDate = document.getElementById('collocation-end-input').value;
     const extraNotes = document.getElementById('collocation-notes-input').value.trim();
     if (!sensorId || !location || !startDate || !endDate) return;
-    if (new Date(endDate) < new Date(startDate)) { alert('End date must be after start date.'); return; }
+    if (new Date(endDate) < new Date(startDate)) { showAlert('Validation Error', 'End date must be after start date.'); return; }
 
     const s = sensors.find(x => x.id === sensorId);
     const communityId = s?.community || '';
@@ -4366,12 +4540,13 @@ function unpinItem(type, id) {
 let deactivatedCommunities = loadData('deactivatedCommunities', []);
 
 function deactivateCommunity(communityId) {
-    if (!confirm('Deactivate this community? It will move to the bottom of the list. All history is preserved.')) return;
-    if (!deactivatedCommunities.includes(communityId)) {
-        deactivatedCommunities.push(communityId);
-        saveData('deactivatedCommunities', deactivatedCommunities);
-    }
-    showView('communities');
+    showConfirm('Deactivate Community', 'Deactivate this community? It will move to the bottom of the list. All history is preserved.', () => {
+        if (!deactivatedCommunities.includes(communityId)) {
+            deactivatedCommunities.push(communityId);
+            saveData('deactivatedCommunities', deactivatedCommunities);
+        }
+        showView('communities');
+    });
 }
 
 function reactivateCommunity(communityId) {
@@ -4406,7 +4581,7 @@ function openAddFieldModal() {
 
     const key = name.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     if (customSensorFields.find(f => f.key === key)) {
-        alert('A field with that name already exists.');
+        showAlert('Duplicate Field', 'A field with that name already exists.');
         return;
     }
 
@@ -4464,18 +4639,19 @@ function wizardSaveAndClose() {
 }
 
 function wizardDiscard() {
-    if (!confirm('Discard this new field and all values entered so far?')) return;
-    if (wizardState) {
-        sensors.forEach(s => { if (s.customFields) delete s.customFields[wizardState.fieldKey]; });
-        customSensorFields = customSensorFields.filter(f => f.key !== wizardState.fieldKey);
-        saveData('customSensorFields', customSensorFields);
-        saveCustomFieldData();
-    }
-    wizardState = null;
-    closeModal('modal-field-wizard');
-    renderSensorTableHeader();
-    renderSensors();
-    if (currentSensor) showSensorView(currentSensor);
+    showConfirm('Discard Field', 'Discard this new field and all values entered so far?', () => {
+        if (wizardState) {
+            sensors.forEach(s => { if (s.customFields) delete s.customFields[wizardState.fieldKey]; });
+            customSensorFields = customSensorFields.filter(f => f.key !== wizardState.fieldKey);
+            saveData('customSensorFields', customSensorFields);
+            saveCustomFieldData();
+        }
+        wizardState = null;
+        closeModal('modal-field-wizard');
+        renderSensorTableHeader();
+        renderSensors();
+        if (currentSensor) showSensorView(currentSensor);
+    }, { danger: true });
 }
 
 function editCustomField(sensorId, fieldKey) {
@@ -4684,40 +4860,33 @@ async function deleteServiceTicket(ticketId) {
     const ticket = serviceTickets.find(t => t.id === ticketId);
     if (!ticket) return;
 
-    const confirmed = confirm(
-        `Delete this service ticket permanently?\n\n` +
-        `Sensor: ${ticket.sensorId}\n` +
-        `Status: ${ticket.status}\n` +
-        `Type: ${formatTicketType(ticket.ticketType)}\n\n` +
-        `This will delete all ticket data and history. This cannot be undone.`
-    );
-    if (!confirmed) return;
+    showConfirm('Delete Service Ticket', `Delete this service ticket permanently?<br><br><strong>Sensor:</strong> ${ticket.sensorId}<br><strong>Status:</strong> ${ticket.status}<br><strong>Type:</strong> ${formatTicketType(ticket.ticketType)}<br><br>This will delete all ticket data and history. This cannot be undone.`, async () => {
+        // Remove from in-memory array
+        const idx = serviceTickets.indexOf(ticket);
+        if (idx >= 0) serviceTickets.splice(idx, 1);
 
-    // Remove from in-memory array
-    const idx = serviceTickets.indexOf(ticket);
-    if (idx >= 0) serviceTickets.splice(idx, 1);
+        // Remove from database
+        try {
+            await supa.from('service_tickets').delete().eq('id', ticketId);
+        } catch (err) {
+            console.error('Delete ticket error:', err);
+        }
 
-    // Remove from database
-    try {
-        await supa.from('service_tickets').delete().eq('id', ticketId);
-    } catch (err) {
-        console.error('Delete ticket error:', err);
-    }
+        // Clean up sensor service statuses
+        const s = sensors.find(x => x.id === ticket.sensorId);
+        if (s) {
+            const serviceStatuses = ['Quant Ticket in Progress', 'In Transit', 'Service at Quant'];
+            const cleaned = getStatusArray(s).filter(st => !serviceStatuses.includes(st));
+            s.status = cleaned.length > 0 ? cleaned : ['Online'];
+            persistSensor(s);
+        }
+        buildSensorSidebar();
 
-    // Clean up sensor service statuses
-    const s = sensors.find(x => x.id === ticket.sensorId);
-    if (s) {
-        const serviceStatuses = ['Quant Ticket in Progress', 'In Transit', 'Service at Quant'];
-        const cleaned = getStatusArray(s).filter(st => !serviceStatuses.includes(st));
-        s.status = cleaned.length > 0 ? cleaned : ['Online'];
-        persistSensor(s);
-    }
-    buildSensorSidebar();
-
-    closeModal('modal-service-ticket');
-    updateSidebarServiceCount();
-    if (document.getElementById('view-service')?.classList.contains('active')) renderServiceView();
-    if (currentSensor === ticket.sensorId) showSensorView(ticket.sensorId);
+        closeModal('modal-service-ticket');
+        updateSidebarServiceCount();
+        if (document.getElementById('view-service')?.classList.contains('active')) renderServiceView();
+        if (currentSensor === ticket.sensorId) showSensorView(ticket.sensorId);
+    }, { danger: true });
 }
 
 function openNewTicketModal(preselectedSensorId) {
@@ -4743,7 +4912,7 @@ async function saveNewTicket(event) {
     const description = document.getElementById('ticket-description-input').value.trim();
     const rmaNumber = document.getElementById('ticket-rma-input').value.trim();
     if (!sensorId || !description) return;
-    if (!isIssue && !isCalibration) { alert('Select at least one action needed.'); return; }
+    if (!isIssue && !isCalibration) { showAlert('Validation Error', 'Select at least one action needed.'); return; }
 
     const actions = [];
     if (isIssue) actions.push('Issue / Repair');
@@ -4925,7 +5094,7 @@ async function saveNewAudit(event) {
     const takedownTeam = document.getElementById('audit-takedown-team-input').value.trim();
     const auditNotes = document.getElementById('audit-notes-input').value.trim();
     if (!auditPodId || !communityId || !communityPodId || !scheduledStart || !scheduledEnd) return;
-    if (new Date(scheduledEnd) < new Date(scheduledStart)) { alert('End date must be after start date.'); return; }
+    if (new Date(scheduledEnd) < new Date(scheduledStart)) { showAlert('Validation Error', 'End date must be after start date.'); return; }
 
     // Check for sensor overlap with existing audits
     const conflicts = audits.filter(a => {
@@ -4935,27 +5104,32 @@ async function saveNewAudit(event) {
         const hasDateOverlap = a.scheduledStart <= scheduledEnd && a.scheduledEnd >= scheduledStart;
         return hasDateOverlap;
     });
+
+    const doSaveAudit = async () => {
+        const conductedBy = [installTeam, takedownTeam].filter(Boolean).join(' / ');
+        const audit = { auditPodId, communityPodId, communityId, status: 'Scheduled', scheduledStart, scheduledEnd,
+            actualStart: null, actualEnd: null, conductedBy, notes: auditNotes, analysisResults: {},
+            createdBy: getCurrentUserName(), createdById: currentUserId };
+        try { const saved = await db.insertAudit(audit); audits.unshift(saved); }
+        catch (err) { handleSaveError(err); audit.id = generateId('aud'); audits.unshift(audit); }
+
+        const communityName = COMMUNITIES.find(c => c.id === communityId)?.name || communityId;
+        createNote('Audit', `Audit scheduled: ${auditPodId} auditing ${communityPodId} at ${communityName} (${scheduledStart} to ${scheduledEnd}).`, {
+            sensors: [auditPodId, communityPodId], communities: [communityId] });
+        closeModal('modal-new-audit'); showSuccessToast('Audit scheduled');
+        updateSidebarAuditCount();
+        if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
+    };
+
     if (conflicts.length > 0) {
         const msgs = conflicts.map(c => {
             const cName = COMMUNITIES.find(x => x.id === c.communityId)?.name || c.communityId;
-            return `\u2022 ${c.auditPodId} \u2194 ${c.communityPodId} at ${cName} (${c.scheduledStart} to ${c.scheduledEnd})`;
+            return `&bull; ${c.auditPodId} &harr; ${c.communityPodId} at ${cName} (${c.scheduledStart} to ${c.scheduledEnd})`;
         });
-        if (!confirm(`Warning: One or more sensors are already assigned to overlapping audits:\n\n${msgs.join('\n')}\n\nSchedule anyway?`)) return;
+        showConfirm('Scheduling Conflict', `Warning: One or more sensors are already assigned to overlapping audits:<br><br>${msgs.join('<br>')}<br><br>Schedule anyway?`, doSaveAudit);
+    } else {
+        doSaveAudit();
     }
-
-    const conductedBy = [installTeam, takedownTeam].filter(Boolean).join(' / ');
-    const audit = { auditPodId, communityPodId, communityId, status: 'Scheduled', scheduledStart, scheduledEnd,
-        actualStart: null, actualEnd: null, conductedBy, notes: auditNotes, analysisResults: {},
-        createdBy: getCurrentUserName(), createdById: currentUserId };
-    try { const saved = await db.insertAudit(audit); audits.unshift(saved); }
-    catch (err) { handleSaveError(err); audit.id = generateId('aud'); audits.unshift(audit); }
-
-    const communityName = COMMUNITIES.find(c => c.id === communityId)?.name || communityId;
-    createNote('Audit', `Audit scheduled: ${auditPodId} auditing ${communityPodId} at ${communityName} (${scheduledStart} to ${scheduledEnd}).`, {
-        sensors: [auditPodId, communityPodId], communities: [communityId] });
-    closeModal('modal-new-audit'); showSuccessToast('Audit scheduled');
-    updateSidebarAuditCount();
-    if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
 }
 
 function openAuditDetail(auditId) {
@@ -5036,49 +5210,52 @@ function advanceAuditStatus(auditId) {
     const oldStatus = audit.status;
     const newStatus = AUDIT_STATUSES[idx + 1];
 
+    const doAdvance = () => {
+        audit.status = newStatus;
+        const updates = { status: newStatus };
+
+        if (newStatus === 'In Progress' && !audit.actualStart) { audit.actualStart = localDate(); updates.actualStart = audit.actualStart; }
+        if (newStatus === 'Complete' && !audit.actualEnd) { audit.actualEnd = localDate(); updates.actualEnd = audit.actualEnd; }
+        persistAuditUpdate(auditId, updates);
+
+        const auditStatusPrefix = 'Audit: ';
+        const communityPod = sensors.find(x => x.id === audit.communityPodId);
+        const auditPod = sensors.find(x => x.id === audit.auditPodId);
+
+        if (communityPod) {
+            const cleaned = getStatusArray(communityPod).filter(st => !st.startsWith(auditStatusPrefix));
+            if (newStatus !== 'Audit Complete') {
+                communityPod.status = [...cleaned, auditStatusPrefix + newStatus];
+            } else {
+                communityPod.status = cleaned.length > 0 ? cleaned : ['Online'];
+            }
+            persistSensor(communityPod);
+        }
+
+        if (auditPod) {
+            const cleaned = getStatusArray(auditPod).filter(st => st !== 'Auditing a Community');
+            if (newStatus === 'In Progress' || newStatus === 'Complete') {
+                auditPod.status = [...cleaned, 'Auditing a Community'];
+            } else if (newStatus === 'Analysis Pending' || newStatus === 'Audit Complete') {
+                auditPod.status = cleaned.length > 0 ? cleaned : ['Online'];
+            }
+            persistSensor(auditPod);
+        }
+        buildSensorSidebar();
+
+        const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || '';
+        createNote('Audit', `Audit advanced: "${oldStatus}" \u2192 "${newStatus}" for ${communityName}.`, { sensors: [audit.auditPodId, audit.communityPodId], communities: [audit.communityId] });
+        openAuditDetail(auditId);
+        updateSidebarAuditCount();
+        if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
+    };
+
     // Warn if skipping analysis
     if (newStatus === 'Audit Complete' && Object.keys(audit.analysisResults || {}).length === 0) {
-        if (!confirm('No analysis data has been uploaded for this audit. Are you sure you want to mark it as complete without DQO analysis?')) return;
+        showConfirm('No Analysis Data', 'No analysis data has been uploaded for this audit. Are you sure you want to mark it as complete without DQO analysis?', doAdvance);
+    } else {
+        doAdvance();
     }
-    audit.status = newStatus;
-    const updates = { status: newStatus };
-
-    if (newStatus === 'In Progress' && !audit.actualStart) { audit.actualStart = localDate(); updates.actualStart = audit.actualStart; }
-    if (newStatus === 'Complete' && !audit.actualEnd) { audit.actualEnd = localDate(); updates.actualEnd = audit.actualEnd; }
-    persistAuditUpdate(auditId, updates);
-
-    // Update sensor statuses — community pod shows current audit step, audit pod shows "Auditing a Community"
-    const auditStatusPrefix = 'Audit: ';
-    const communityPod = sensors.find(x => x.id === audit.communityPodId);
-    const auditPod = sensors.find(x => x.id === audit.auditPodId);
-
-    if (communityPod) {
-        // Remove any previous audit status
-        const cleaned = getStatusArray(communityPod).filter(st => !st.startsWith(auditStatusPrefix));
-        if (newStatus !== 'Audit Complete') {
-            communityPod.status = [...cleaned, auditStatusPrefix + newStatus];
-        } else {
-            communityPod.status = cleaned.length > 0 ? cleaned : ['Online'];
-        }
-        persistSensor(communityPod);
-    }
-
-    if (auditPod) {
-        const cleaned = getStatusArray(auditPod).filter(st => st !== 'Auditing a Community');
-        if (newStatus === 'In Progress' || newStatus === 'Complete') {
-            auditPod.status = [...cleaned, 'Auditing a Community'];
-        } else if (newStatus === 'Analysis Pending' || newStatus === 'Audit Complete') {
-            auditPod.status = cleaned.length > 0 ? cleaned : ['Online'];
-        }
-        persistSensor(auditPod);
-    }
-    buildSensorSidebar();
-
-    const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || '';
-    createNote('Audit', `Audit advanced: "${oldStatus}" \u2192 "${newStatus}" for ${communityName}.`, { sensors: [audit.auditPodId, audit.communityPodId], communities: [audit.communityId] });
-    openAuditDetail(auditId);
-    updateSidebarAuditCount();
-    if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
 }
 
 function revertAuditStatus(auditId) {
@@ -5149,50 +5326,43 @@ async function deleteAudit(auditId) {
     if (!audit) return;
     const communityName = COMMUNITIES.find(c => c.id === audit.communityId)?.name || audit.communityId;
 
-    const confirmed = confirm(
-        `Delete this audit permanently?\n\n` +
-        `Community: ${communityName}\n` +
-        `Pods: ${audit.auditPodId} \u2194 ${audit.communityPodId}\n` +
-        `Dates: ${audit.scheduledStart || '?'} to ${audit.scheduledEnd || '?'}\n\n` +
-        `This will delete all audit data, analysis results, and associated notes. This cannot be undone.`
-    );
-    if (!confirmed) return;
+    showConfirm('Delete Audit', `Delete this audit permanently?<br><br><strong>Community:</strong> ${communityName}<br><strong>Pods:</strong> ${audit.auditPodId} &harr; ${audit.communityPodId}<br><strong>Dates:</strong> ${audit.scheduledStart || '?'} to ${audit.scheduledEnd || '?'}<br><br>This will delete all audit data, analysis results, and associated notes. This cannot be undone.`, async () => {
+        // Remove from in-memory array
+        const idx = audits.indexOf(audit);
+        if (idx >= 0) audits.splice(idx, 1);
 
-    // Remove from in-memory array
-    const idx = audits.indexOf(audit);
-    if (idx >= 0) audits.splice(idx, 1);
+        // Remove from database
+        try {
+            await supa.from('audits').delete().eq('id', auditId);
+        } catch (err) {
+            console.error('Delete audit error:', err);
+        }
 
-    // Remove from database
-    try {
-        await supa.from('audits').delete().eq('id', auditId);
-    } catch (err) {
-        console.error('Delete audit error:', err);
-    }
+        // Clean up cached analysis data
+        delete analysisDataCache[auditId];
 
-    // Clean up cached analysis data
-    delete analysisDataCache[auditId];
+        // Clean up sensor audit statuses if the audit was in progress
+        const auditStatusPrefix = 'Audit: ';
+        const communityPod = sensors.find(x => x.id === audit.communityPodId);
+        const auditPod = sensors.find(x => x.id === audit.auditPodId);
+        if (communityPod) {
+            const cleaned = getStatusArray(communityPod).filter(st => !st.startsWith(auditStatusPrefix));
+            communityPod.status = cleaned.length > 0 ? cleaned : ['Online'];
+            persistSensor(communityPod);
+        }
+        if (auditPod) {
+            const cleaned = getStatusArray(auditPod).filter(st => st !== 'Auditing a Community');
+            auditPod.status = cleaned.length > 0 ? cleaned : ['Online'];
+            persistSensor(auditPod);
+        }
+        buildSensorSidebar();
 
-    // Clean up sensor audit statuses if the audit was in progress
-    const auditStatusPrefix = 'Audit: ';
-    const communityPod = sensors.find(x => x.id === audit.communityPodId);
-    const auditPod = sensors.find(x => x.id === audit.auditPodId);
-    if (communityPod) {
-        const cleaned = getStatusArray(communityPod).filter(st => !st.startsWith(auditStatusPrefix));
-        communityPod.status = cleaned.length > 0 ? cleaned : ['Online'];
-        persistSensor(communityPod);
-    }
-    if (auditPod) {
-        const cleaned = getStatusArray(auditPod).filter(st => st !== 'Auditing a Community');
-        auditPod.status = cleaned.length > 0 ? cleaned : ['Online'];
-        persistSensor(auditPod);
-    }
-    buildSensorSidebar();
-
-    closeModal('modal-audit-detail');
-    updateSidebarAuditCount();
-    if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
-    if (currentCommunity) showCommunityView(currentCommunity);
-    if (currentSensor) showSensorView(currentSensor);
+        closeModal('modal-audit-detail');
+        updateSidebarAuditCount();
+        if (document.getElementById('view-audits')?.classList.contains('active')) renderAuditsView();
+        if (currentCommunity) showCommunityView(currentCommunity);
+        if (currentSensor) showSensorView(currentSensor);
+    }, { danger: true });
 }
 
 function beginAnalysis(auditId) {
@@ -6723,18 +6893,19 @@ async function loadAuditPhotoUrls(auditId, communityId, files) {
 }
 
 async function deleteAuditPhoto(communityId, fileId, storagePath, auditId) {
-    if (!confirm('Delete this photo?')) return;
-    try {
-        await supa.storage.from('community-files').remove([storagePath]);
-        await supa.from('community_files').delete().eq('id', fileId);
-        const arr = communityFiles[communityId];
-        if (arr) {
-            const idx = arr.findIndex(f => f.id === fileId);
-            if (idx >= 0) arr.splice(idx, 1);
-        }
-    } catch (err) { handleSaveError(err); }
-    const grid = document.getElementById('audit-photos-grid');
-    if (grid) grid.innerHTML = renderAuditPhotos(auditId, communityId);
+    showConfirm('Delete Photo', 'Delete this photo? This cannot be undone.', async () => {
+        try {
+            await supa.storage.from('community-files').remove([storagePath]);
+            await supa.from('community_files').delete().eq('id', fileId);
+            const arr = communityFiles[communityId];
+            if (arr) {
+                const idx = arr.findIndex(f => f.id === fileId);
+                if (idx >= 0) arr.splice(idx, 1);
+            }
+        } catch (err) { handleSaveError(err); }
+        const grid = document.getElementById('audit-photos-grid');
+        if (grid) grid.innerHTML = renderAuditPhotos(auditId, communityId);
+    }, { danger: true });
 }
 
 async function uploadAuditPhotos(auditId, communityId, files) {
@@ -6842,12 +7013,12 @@ async function importSensors(event) {
             imported++;
         }
 
-        alert(`Import complete: ${imported} sensors added, ${skipped} skipped (duplicate or missing ID).`);
+        showAlert('Import Complete', `${imported} sensors added, ${skipped} skipped (duplicate or missing ID).`);
         event.target.value = '';
         renderSensors();
         buildSensorSidebar();
     } catch (err) {
-        alert('Import failed: ' + err.message);
+        showAlert('Error', 'Import failed: ' + err.message);
         console.error('Import error:', err);
     }
 }
