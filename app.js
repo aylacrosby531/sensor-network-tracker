@@ -3849,7 +3849,7 @@ async function sendUserInvite(event) {
 
     // Show success state
     document.getElementById('invite-modal-title').textContent = 'Invite Sent';
-    document.getElementById('invite-success-email').textContent = `An invitation email has been sent to ${email}. They'll receive a link to create their account.`;
+    document.getElementById('invite-success-email').innerHTML = `An invitation email has been sent to <strong>${escapeHtml(email)}</strong>.<br>They'll receive a link to create their account.`;
     document.getElementById('invite-step-form').style.display = 'none';
     document.getElementById('invite-step-success').style.display = '';
     btn.disabled = false;
