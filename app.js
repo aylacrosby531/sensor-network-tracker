@@ -3884,15 +3884,16 @@ async function permanentlyDeleteUser(id, email) {
         // Second warning — final confirmation
         showConfirm('Final Warning', 'This action cannot be undone!<br><br>Permanently deleting <strong>"' + email + '"</strong> will:<br>&bull; Remove their account entirely<br>&bull; Change all their past edits and notes to show "[Deleted User]"<br><br>Are you absolutely sure you want to delete this user?', async () => {
             try {
-                const { data: profileRow } = await supa.from('profiles').select('id').eq('email', email).single();
+                // Anonymize in-memory data
+                const { data: profileRow } = await supa.from('profiles').select('id').eq('email', email).maybeSingle();
                 if (profileRow) {
-                    await supa.from('profiles').update({ name: '[Deleted User]', email: '' }).eq('id', profileRow.id);
+                    notes.forEach(n => { if (n.createdById === profileRow.id) n.createdBy = '[Deleted User]'; });
+                    comms.forEach(c => { if (c.createdById === profileRow.id) c.createdBy = '[Deleted User]'; });
                 }
 
+                // Delete auth user, profile, and allowed_emails entry via RPC
+                await supa.rpc('delete_auth_user', { user_email: email });
                 await supa.from('allowed_emails').delete().eq('id', id);
-
-                notes.forEach(n => { if (profileRow && n.createdById === profileRow.id) n.createdBy = '[Deleted User]'; });
-                comms.forEach(c => { if (profileRow && c.createdById === profileRow.id) c.createdBy = '[Deleted User]'; });
 
                 const session = await db.getSession();
                 await renderAllowedUsers(session?.user?.email || '');
