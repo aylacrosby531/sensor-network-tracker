@@ -815,25 +815,6 @@ body {
     padding: 4px 0;
 }
 
-.dark-mode-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 20px;
-    margin: 4px 8px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--slate-500);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    transition: all 0.2s var(--ease-out);
-}
-
-.dark-mode-toggle:hover {
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--slate-400);
-}
 
 @media (max-width: 768px) {
     .mobile-header { display: flex; }
@@ -2277,27 +2258,6 @@ tr:last-child td {
     .ov-card-wide { grid-column: span 1; }
 }
 
-.dark-mode .ov-card {
-    background: #1e293b;
-    border-color: rgba(255,255,255,0.06);
-}
-
-.dark-mode .ov-sensor-card {
-    border-color: rgba(255,255,255,0.08);
-}
-
-.dark-mode .ov-sensor-card:hover,
-.dark-mode .ov-contact-row:hover {
-    background: rgba(255,255,255,0.04);
-}
-
-.dark-mode .ov-timeline-type {
-    background: rgba(27,42,74,0.4);
-}
-
-.dark-mode .ov-audit-card {
-    border-color: rgba(255,255,255,0.08);
-}
 
 /* ===== ANALYSIS CHARTS ===== */
 .analysis-chart-card {
@@ -2440,19 +2400,6 @@ tr:last-child td {
     border-radius: 2px;
 }
 
-.dark-mode .chart-axis-label:hover {
-    background: rgba(255,255,255,0.05);
-}
-
-.dark-mode .chart-axis-label,
-.dark-mode .chart-equation,
-.dark-mode .chart-ts-legend {
-    color: var(--slate-400);
-}
-
-.dark-mode .chart-scale-btn {
-    color: var(--slate-500);
-}
 
 .chart-subtitle-input {
     width: 100%;
@@ -2479,17 +2426,6 @@ tr:last-child td {
     outline: none;
     background: var(--surface);
 }
-
-.dark-mode .chart-title-editable:hover {
-    background: rgba(255,255,255,0.05);
-}
-
-.dark-mode .chart-title-input {
-    background: #151e2b;
-    border-color: rgba(255,255,255,0.2);
-    color: #e2e8f0;
-}
-
 
 .axis-popover {
     position: absolute;
@@ -2554,17 +2490,6 @@ tr:last-child td {
     cursor: pointer;
     padding: 0 2px;
     line-height: 1;
-}
-
-.dark-mode .axis-popover {
-    background: #1e293b;
-    border-color: rgba(255,255,255,0.1);
-}
-
-.dark-mode .axis-popover-row input {
-    background: #151e2b;
-    border-color: rgba(255,255,255,0.1);
-    color: #e2e8f0;
 }
 
 /* Raw Data Table */
@@ -2801,10 +2726,6 @@ tr:last-child td {
 
 .audit-photo-thumb:hover .audit-photo-delete {
     display: flex;
-}
-
-.dark-mode .audit-photo-thumb {
-    border-color: rgba(255,255,255,0.1);
 }
 
 .analysis-section-heading {
@@ -3958,13 +3879,6 @@ th:hover .field-reorder-btns {
 .ticket-edit-input:hover { border-color: var(--slate-200); background: var(--surface); }
 .ticket-edit-input:focus { border-color: var(--navy-500); background: var(--surface); outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 176, 0.1); }
 
-.dark-mode .service-pipeline-column { background: #151e2b; }
-.dark-mode .service-ticket-card { background: #1e293b; }
-.dark-mode .ticket-detail-actions { border-top-color: rgba(255,255,255,0.06); }
-.dark-mode .ticket-step.pending .ticket-step-dot { background: #334155; }
-.dark-mode .ticket-step.pending .ticket-step-label { color: #475569; }
-.dark-mode .ticket-edit-input { background: #151e2b; border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
-
 /* ===== TRACKING LINK ===== */
 .tracking-link {
     color: var(--navy-500);
@@ -4016,10 +3930,6 @@ th:hover .field-reorder-btns {
 .analysis-results-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 10px; border-bottom: 2px solid var(--slate-200); }
 .analysis-results-table td { padding: 6px 10px; border-bottom: 1px solid var(--slate-100); color: var(--slate-700); font-family: var(--font-mono); }
 
-.dark-mode .audit-pipeline-column { background: #151e2b; }
-.dark-mode .audit-card { background: #1e293b; }
-.dark-mode .audit-unaudited-card { background: #1e293b; border-color: #334155; }
-
 /* ===== SAVE ERROR TOAST ===== */
 .save-error-toast {
     position: fixed;
@@ -4066,169 +3976,10 @@ th:hover .field-reorder-btns {
 }
 
 /* ===== DARK MODE ===== */
-.dark-mode {
-    --slate-950: #f8fafc;
-    --slate-900: #f1f5f9;
-    --slate-800: #e2e8f0;
-    --slate-700: #cbd5e1;
-    --slate-600: #94a3b8;
-    --slate-500: #64748b;
-    --slate-400: #475569;
-    --slate-300: #334155;
-    --slate-200: #1e293b;
-    --slate-100: #1a2332;
-    --slate-50: #151e2b;
-    --surface: #1e293b;
-    --navy-800: #93c5fd;
-    --navy-700: #60a5fa;
-    --navy-600: #3b82f6;
-    --navy-500: #2563eb;
-    --navy-400: #1d4ed8;
-    --navy-300: #1e40af;
-    --navy-200: #1e3a5f;
-    --navy-100: #172554;
-}
-
-.dark-mode body {
-    background: #0f172a;
-    color: var(--slate-800);
-}
-
-.dark-mode #sidebar {
-    background: linear-gradient(195deg, #0c1220 0%, #080d18 100%);
-}
-
-.dark-mode .modal-content {
-    background: #1e293b;
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-.dark-mode .table-container,
-.dark-mode .settings-section,
-.dark-mode .community-detail-header {
-    background: #1e293b;
-    border-color: rgba(255, 255, 255, 0.06);
-}
-
-.dark-mode th {
-    background: #151e2b;
-    border-color: rgba(255, 255, 255, 0.06);
-}
-
-.dark-mode td {
-    border-color: rgba(255, 255, 255, 0.04);
-}
-
-.dark-mode .login-card {
-    background: #1e293b;
-}
-
-.dark-mode .login-field input,
-.dark-mode .form-group input,
-.dark-mode .form-group select,
-.dark-mode .form-group textarea,
-.dark-mode .filter-bar input,
-.dark-mode .filter-bar select {
-    background: #151e2b;
-    border-color: rgba(255, 255, 255, 0.1);
-    color: #e2e8f0;
-}
-
-.dark-mode .global-search-bar {
-    background: #151e2b;
-}
-
-.dark-mode .global-search-bar input {
-    background: #1e293b;
-}
-
-.dark-mode .open-tabs-bar {
-    background: #151e2b;
-    border-color: rgba(255, 255, 255, 0.06);
-}
-
-.dark-mode .mobile-header {
-    background: #0c1220;
-}
-
-.dark-mode .hamburger-btn {
-    color: #94a3b8;
-}
-
-.dark-mode .dash-stat {
-    background: #1e293b;
-    border-color: rgba(255, 255, 255, 0.06);
-}
-
-.dark-mode .community-row {
-    background: #1e293b;
-    border-color: rgba(255, 255, 255, 0.04);
-}
-
-.dark-mode .timeline-item {
-    background: #1e293b;
-    border-color: rgba(255, 255, 255, 0.04);
-}
-
-.dark-mode .analysis-instructions {
-    background: #151e2b;
-    border-color: rgba(255, 255, 255, 0.08);
-    color: #94a3b8;
-}
-
-.dark-mode .analysis-upload-zone {
-    border-color: rgba(255, 255, 255, 0.1);
-}
-
-.dark-mode .analysis-upload-zone:hover {
-    border-color: rgba(201, 168, 76, 0.4);
-    background: #151e2b;
-}
-
-.dark-mode .analysis-chart-card {
-    background: #1e293b;
-    border-color: rgba(255, 255, 255, 0.06);
-}
-
-.dark-mode .analysis-raw-table th {
-    background: #0c1220;
-}
-
-.dark-mode .analysis-raw-table tr:nth-child(even) {
-    background: #151e2b;
-}
-
-.dark-mode .analysis-raw-table .trimmed-row {
-    background: rgba(201, 168, 76, 0.08);
-}
-
-.dark-mode .audit-list-card {
-    background: #1e293b;
-    border-color: rgba(255, 255, 255, 0.06);
-}
-
-.dark-mode .analysis-name-input {
-    background: #151e2b;
-    border-color: rgba(255, 255, 255, 0.1);
-    color: #e2e8f0;
-}
-
-.dark-mode .dqo-pass { background: rgba(26, 127, 55, 0.15); color: #4ade80; }
-.dark-mode .dqo-fail { background: rgba(197, 48, 48, 0.15); color: #fca5a5; }
-.dark-mode .dqo-overall.pass { background: rgba(26, 127, 55, 0.1); border-color: rgba(74, 222, 128, 0.3); color: #4ade80; }
-.dark-mode .dqo-overall.fail { background: rgba(197, 48, 48, 0.1); border-color: rgba(252, 165, 165, 0.3); color: #fca5a5; }
-.dark-mode .dqo-cell-pass { color: #4ade80; }
-.dark-mode .dqo-cell-fail { color: #fca5a5; }
-.dark-mode .dqo-summary-table tbody tr:nth-child(even) { background: #151e2b; }
-
-.dark-mode .analysis-dqo-thresholds {
-    background: #151e2b;
-}
-
 /* ===== PRINT STYLES ===== */
 @media print {
     #sidebar, .mobile-header, .sidebar-overlay, .global-search-bar,
-    .open-tabs-bar, .back-button, .setup-mode-toggle, .dark-mode-toggle,
+    .open-tabs-bar, .back-button, .setup-mode-toggle,
     .btn, button, .history-actions, .filter-bar, .sidebar-bottom-actions,
     .community-detail-toolbar, .timeline-actions, .no-print {
         display: none !important;

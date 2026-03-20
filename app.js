@@ -3665,11 +3665,9 @@ async function renderSettings() {
     const session = await db.getSession();
     const userEmail = session?.user?.email || '';
 
-    const joinedDate = profile?.created_at ? formatDate(profile.created_at) : '—';
     document.getElementById('settings-profile').innerHTML = `
         <div class="info-item"><label>Name</label><p class="settings-editable-name" onclick="editProfileName(this)" title="Click to edit">${escapeHtml(profile?.name || '—')} <span style="font-size:11px;color:var(--slate-300);margin-left:4px">&#9998;</span></p></div>
         <div class="info-item"><label>Email</label><p>${escapeHtml(userEmail)}</p></div>
-        <div class="info-item"><label>Joined</label><p>${joinedDate}</p></div>
     `;
 
     await renderAllowedUsers(userEmail);
@@ -7056,23 +7054,6 @@ async function uploadAuditPhotos(auditId, communityId, files) {
     if (grid) grid.innerHTML = renderAuditPhotos(auditId, communityId);
 }
 
-// ===== DARK MODE =====
-function toggleDarkMode() {
-    document.documentElement.classList.toggle('dark-mode');
-    const isDark = document.documentElement.classList.contains('dark-mode');
-    localStorage.setItem('snt_darkMode', isDark ? 'true' : 'false');
-    const label = document.getElementById('dark-mode-label');
-    if (label) label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
-}
-
-function loadDarkMode() {
-    if (localStorage.getItem('snt_darkMode') === 'true') {
-        document.documentElement.classList.add('dark-mode');
-        const label = document.getElementById('dark-mode-label');
-        if (label) label.textContent = 'Light Mode';
-    }
-}
-
 // ===== MOBILE SIDEBAR =====
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('mobile-open');
@@ -7144,7 +7125,6 @@ async function importSensors(event) {
 }
 
 // ===== INIT =====
-loadDarkMode();
 
 (async function init() {
     try {
